@@ -1,0 +1,411 @@
+/* ==========================================================
+   MediSafe Universal Theme CSS
+   Link this BEFORE your page-specific CSS on every page.
+   ========================================================== */
+
+/* ── Light Mode (default) ── */
+:root {
+    /* Backgrounds */
+    --bg-primary:        #f8f9fa;
+    --bg-secondary:      #ffffff;
+    --bg-hover:          #f3f4f6;
+
+    /* Text */
+    --text-primary:      #1a1a1a;
+    --text-secondary:    #6b7280;
+    --text-muted:        #9ca3af;
+
+    /* Borders & Shadows */
+    --border-color:      #e5e7eb;
+    --shadow-sm:         rgba(0, 0, 0, 0.04);
+    --shadow-md:         rgba(0, 0, 0, 0.08);
+
+    /* Brand */
+    --brand-primary:     #05318a;
+    --brand-secondary:   #4a9fd8;
+    --brand-gradient:    linear-gradient(135deg, #05318a 0%, #4a9fd8 100%);
+
+    /* Components */
+    --card-bg:           #ffffff;
+    --input-bg:          #f9fafb;
+    --input-border:      #e5e7eb;
+    --toggle-off:        #e5e7eb;
+    --sidebar-bg:        #ffffff;
+    --table-header-bg:   #f9fafb;
+    --table-row-hover:   #f9fafb;
+    --badge-bg:          #f3f4f6;
+    --badge-color:       #6b7280;
+}
+
+/* ── Dark Mode ── */
+[data-theme="dark"],
+body.dark-mode {
+    /* Backgrounds */
+    --bg-primary:        #111827;
+    --bg-secondary:      #1f2937;
+    --bg-hover:          #374151;
+
+    /* Text */
+    --text-primary:      #f9fafb;
+    --text-secondary:    #9ca3af;
+    --text-muted:        #6b7280;
+
+    /* Borders & Shadows */
+    --border-color:      #374151;
+    --shadow-sm:         rgba(0, 0, 0, 0.3);
+    --shadow-md:         rgba(0, 0, 0, 0.5);
+
+    /* Brand (unchanged) */
+    --brand-primary:     #4a9fd8;
+    --brand-secondary:   #4a9fd8;
+    --brand-gradient:    linear-gradient(135deg, #1d4ed8 0%, #4a9fd8 100%);
+
+    /* Components */
+    --card-bg:           #1f2937;
+    --input-bg:          #374151;
+    --input-border:      #4b5563;
+    --toggle-off:        #4b5563;
+    --sidebar-bg:        #1f2937;
+    --table-header-bg:   #374151;
+    --table-row-hover:   #2d3748;
+    --badge-bg:          #374151;
+    --badge-color:       #9ca3af;
+}
+
+/* ==========================================================
+   Global resets that use the variables — add to every page
+   ========================================================== */
+
+body {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ── Sidebar ── */
+.sidebar {
+    background: var(--sidebar-bg) !important;
+    border-right-color: var(--border-color) !important;
+}
+
+.brand-name {
+    color: var(--text-primary) !important;
+}
+
+.nav-item {
+    color: var(--text-secondary) !important;
+}
+
+.nav-item:hover {
+    background: var(--bg-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.nav-item.active {
+    background: var(--brand-gradient) !important;
+    color: #ffffff !important;
+}
+
+.profile-section {
+    border-top-color: var(--border-color) !important;
+}
+
+.logout-item {
+    color: var(--brand-secondary) !important;
+}
+
+.logout-item:hover {
+    background: var(--bg-hover) !important;
+}
+
+/* ── Page Title ── */
+#page-title {
+    color: var(--text-primary) !important;
+}
+
+/* ── Cards ── */
+.metric-card,
+.chart-card,
+.audit-card,
+.settings-section,
+.profile-card,
+.filter-section,
+.stat-card {
+    background: var(--card-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
+.metric-card.temperature {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+
+.metric-card.humidity {
+    background: var(--bg-secondary) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* ── Metric text ── */
+.metric-label,
+.metric-value,
+.chart-header,
+.audit-title,
+.section-header,
+.setting-label,
+.stat-label,
+.stat-value,
+.filter-label,
+.detail-item label {
+    color: var(--text-primary) !important;
+}
+
+.setting-description,
+.time-cell,
+.text-secondary {
+    color: var(--text-secondary) !important;
+}
+
+/* ── Table ── */
+.audit-table thead {
+    background: var(--table-header-bg) !important;
+}
+
+.audit-table th {
+    color: var(--text-secondary) !important;
+}
+
+.audit-table tbody tr {
+    border-bottom-color: var(--border-color) !important;
+}
+
+.audit-table tbody tr:hover {
+    background: var(--table-row-hover) !important;
+}
+
+.audit-table td {
+    color: var(--text-primary) !important;
+}
+
+/* ── Filter selects ── */
+.filter-select {
+    background: var(--input-bg) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.filter-select:focus {
+    border-color: var(--brand-secondary) !important;
+}
+
+/* ── Inputs (profile / signup) ── */
+.detail-item input,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"] {
+    background: var(--input-bg) !important;
+    border-color: var(--input-border) !important;
+    color: var(--text-primary) !important;
+}
+
+.detail-item input:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="tel"]:focus {
+    border-color: var(--brand-secondary) !important;
+}
+
+/* ── Badges & Counts ── */
+.record-count {
+    background: var(--badge-bg) !important;
+    color: var(--badge-color) !important;
+}
+
+/* ── Pagination ── */
+.page-btn {
+    background: var(--card-bg) !important;
+    border-color: var(--border-color) !important;
+    color: var(--text-secondary) !important;
+}
+
+.page-btn:hover {
+    border-color: var(--brand-secondary) !important;
+    color: var(--brand-secondary) !important;
+}
+
+.page-btn.active {
+    background: var(--brand-gradient) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+
+/* ── Toggle switches ── */
+.toggle-slider {
+    background-color: var(--toggle-off) !important;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: var(--brand-secondary) !important;
+}
+
+/* ── Custom checkbox ── */
+.custom-checkbox {
+    background: var(--card-bg) !important;
+    border-color: var(--brand-secondary) !important;
+}
+
+/* ── Theme selector cards ── */
+.theme-option {
+    background: var(--card-bg) !important;
+    border-color: var(--border-color) !important;
+}
+
+.theme-name {
+    color: var(--text-primary) !important;
+}
+
+.theme-option.active {
+    border-color: var(--brand-secondary) !important;
+}
+
+/* ── Section divider ── */
+.section-header {
+    border-bottom-color: var(--border-color) !important;
+}
+
+.setting-item {
+    border-bottom-color: var(--border-color) !important;
+}
+
+/* ── Profile header stays gradient (intentional) ── */
+.profile-header {
+    background: var(--brand-gradient) !important;
+}
+
+/* ── Email display section ── */
+.email-section {
+    border-top-color: var(--border-color) !important;
+}
+
+/* ── Transition for smooth theme switch on all elements ── */
+.sidebar,
+.metric-card,
+.chart-card,
+.audit-card,
+.settings-section,
+.profile-card,
+.filter-section,
+.audit-table thead,
+.audit-table tbody tr,
+.filter-select,
+.detail-item input,
+.page-btn,
+.toggle-slider,
+.theme-option {
+    transition: background-color 0.3s ease,
+                border-color 0.3s ease,
+                color 0.3s ease !important;
+}
+
+/* ── Global responsive helpers ── */
+@media (max-width: 1024px) {
+    .app-container,
+    .app {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        position: relative;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+        transform: translateX(0) !important;
+    }
+
+    .main-content,
+    .main,
+    .content,
+    .content-body {
+        margin-left: 0 !important;
+        width: 100% !important;
+        padding: 20px !important;
+    }
+
+    .header {
+        padding: 18px 20px !important;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .nav-section {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .nav-item,
+    .logout-item,
+    .profile-section {
+        width: auto !important;
+    }
+
+    .monitoring-table,
+    .audit-table,
+    table {
+        min-width: 0 !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        flex-direction: row;
+        justify-content: space-around;
+        align-items: center;
+        padding: 12px;
+    }
+
+    .nav-item {
+        padding: 10px 12px;
+        margin: 6px;
+        font-size: 0.95rem;
+    }
+
+    .header {
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+
+    .main-content,
+    .main,
+    .content,
+    .content-body {
+        padding: 16px !important;
+    }
+
+    .login-card,
+    .metric-card,
+    .chart-card,
+    .profile-card,
+    .table-card,
+    .modal-content {
+        width: 100% !important;
+        box-sizing: border-box;
+    }
+
+    .monitoring-table th,
+    .monitoring-table td,
+    th,
+    td {
+        padding: 10px 8px;
+        font-size: 0.9rem;
+    }
+
+    .table-card,
+    .profile-card,
+    .chart-card {
+        padding: 16px;
+    }
+}

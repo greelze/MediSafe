@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediSafe - Settings</title>
+    <link rel="stylesheet" href="settings_page.css">
+
+    <link rel="stylesheet" href="theme.css">
+    
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="logo-section">
+                <div class="logo">🏥</div>
+                <div class="brand-name">MediSafe</div>
+            </div>
+
+            <div class="nav-section">
+                <a href="dashboard_page.html" class="nav-item">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-text">Home</span>
+                </a>
+                <a href="history_page.html" class="nav-item">
+                    <span class="nav-icon">🕒</span>
+                    <span class="nav-text">Threshold History</span>
+                </a>
+                <a href="analytics_page.html" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Analytics</span>
+                </a>
+                <a href="audit_trail_local.html" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-text">Audit Trail</span>
+                </a>
+                <a href="monitoring_log.html" class="nav-item">
+                    <span class="nav-icon">🩺</span>
+                    <span class="nav-text">Monitoring Log</span>
+                <a href="settings_page.html" class="nav-item active">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Settings</span>
+                </a>
+            </div>
+            
+            <div class="profile-section">
+                <a href="profile_page.html" class="profile-link" aria-label="Go to profile">
+                    <div class="avatar-placeholder"></div>
+                </a>
+                <a href="login_page.html" class="nav-item logout-item" id="logout-btn">
+                    <span class="nav-icon">🚪</span>
+                    <span class="nav-text">Logout</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="header">
+                <span id="page-title">Settings</span>
+            </div>
+
+            <div class="settings-container">
+                <!-- Appearance Settings -->
+                <div class="settings-section">
+                    <h2 class="section-header">Appearance</h2>
+                    
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-label">Theme Mode</div>
+                            <div class="setting-description">Choose your preferred theme</div>
+                        </div>
+                    </div>
+
+                    <div class="theme-selector">
+                        <button class="theme-option active" id="light-theme" onclick="setTheme('light')">
+                            <div class="theme-icon">☀️</div>
+                            <div class="theme-name">Light Mode</div>
+                        </button>
+                        <button class="theme-option" id="dark-theme" onclick="setTheme('dark')">
+                            <div class="theme-icon">🌙</div>
+                            <div class="theme-name">Dark Mode</div>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main ON/OFF Settings -->
+                <div class="settings-section">
+                    <h2 class="section-header">Main ON/OFF</h2>
+                    
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-label">Enable alerts</div>
+                            <div class="setting-description">Receive alerts when thresholds are exceeded</div>
+                        </div>
+                        <label class="toggle-switch" for="enable-alerts">
+                            <input type="checkbox" id="enable-alerts" checked aria-label="Enable alerts">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                </div>
+
+                
+                <!-- System Settings -->
+                <div class="settings-section">
+                    <h2 class="section-header">System</h2>
+                    
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-label">Auto-save reports</div>
+                            <div class="setting-description">Automatically save daily reports</div>
+                        </div>
+                        <label class="toggle-switch" for="auto-save">
+                            <input type="checkbox" id="auto-save" checked aria-label="Auto-save reports">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <div class="setting-label">Data backup</div>
+                            <div class="setting-description">Enable automatic data backup</div>
+                        </div>
+                        <label class="toggle-switch" for="data-backup">
+                            <input type="checkbox" id="data-backup" checked aria-label="Data backup">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Save Button -->
+                <button class="save-button" id="save-settings">
+                    Save All Settings
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load saved theme on page load
+        globalThis.addEventListener('DOMContentLoaded', function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            applyTheme(savedTheme);
+            
+            // Load all saved settings
+            loadSettings();
+        });
+
+        // Theme functions
+        function setTheme(theme) {
+            applyTheme(theme);
+            localStorage.setItem('theme', theme);
+        }
+
+        function applyTheme(theme) {
+            const body = document.body;
+            const lightTheme = document.getElementById('light-theme');
+            const darkTheme = document.getElementById('dark-theme');
+
+            if (theme === 'dark') {
+                body.classList.add('dark-mode');
+                lightTheme.classList.remove('active');
+                darkTheme.classList.add('active');
+            } else {
+                body.classList.remove('dark-mode');
+                lightTheme.classList.add('active');
+                darkTheme.classList.remove('active');
+            }
+        }
+
+
+        // Save settings
+        document.getElementById('save-settings').addEventListener('click', function() {
+            const settings = {
+                enableAlerts: document.getElementById('enable-alerts').checked,
+                autoSave: document.getElementById('auto-save').checked,
+                dataBackup: document.getElementById('data-backup').checked,
+                theme: localStorage.getItem('theme') || 'light'
+            };
+
+            // Save to localStorage
+            localStorage.setItem('settings', JSON.stringify(settings));
+
+            // Show success message
+            const saveButton = document.getElementById('save-settings');
+            const originalText = saveButton.textContent;
+            saveButton.textContent = '✓ Settings Saved!';
+            saveButton.style.background = '#10b981';
+            
+            setTimeout(() => {
+                saveButton.textContent = originalText;
+                saveButton.style.background = '';
+            }, 2000);
+
+            console.log('Settings saved:', settings);
+        });
+
+        // Load settings
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('settings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                
+                document.getElementById('enable-alerts').checked = settings.enableAlerts;
+                document.getElementById('auto-save').checked = settings.autoSave;
+                document.getElementById('data-backup').checked = settings.dataBackup;
+            }
+        }
+
+        // Logout functionality - automatic logout and redirect to login_page.html
+        document.getElementById('logout-btn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    // Sign out from Supabase auth
+                    const { error } = await supabase.auth.signOut();
+                    if (error) console.error('Logout error:', error);
+                } catch (err) {
+                    console.error('Logout failed:', err);
+                }
+                
+                console.log('Logging out...');
+                window.location.href = 'login_page.html';
+            }
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="profile_sync.js"></script> 
+    <script src="theme.js"></script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediSafe Profile</title>
+    <link rel="stylesheet" href="profile_page.css">
+    <link rel="stylesheet" href="theme.css">
+</head>
+<body>
+    
+    <div class="app-container">
+        
+        <div class="sidebar">
+            <div class="logo-section">
+                <div class="logo">🏥</div>
+                <div class="brand-name">MediSafe</div>
+            </div>
+            
+            <div class="nav-section">
+                <a href="dashboard_page.html" class="nav-item">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-text">Home</span>
+                </a>
+                <a href="history_page.html" class="nav-item">
+                    <span class="nav-icon">🕒</span>
+                    <span class="nav-text">Threshold History</span>
+                </a>
+                <a href="analytics_page.html" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Analytics</span>
+                </a>
+                <a href="audit_trail_local.html" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-text">Audit Trail</span>
+                </a>
+                <a href="monitoring_log.html" class="nav-item">
+                    <span class="nav-icon">🩺</span>
+                    <span class="nav-text">Monitoring Log</span>
+                </a>
+                <a href="settings_page.html" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Settings</span>
+                </a>
+            </div>
+            
+            <div class="profile-section">
+                <!-- ✅ USERNAME ALIGNED TO RIGHT AND VERTICALLY PANTAY -->
+                <div style="position:relative; display:inline-block; width:100%;">
+                    <a href="profile_page.html" class="profile-link active" style="display:inline-block;">
+                        <div class="avatar-placeholder">
+                            <img id="sidebarProfileImage"
+                                 src="default-profile.png"
+                                 alt="Profile"
+                                 style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
+                        </div>
+                    </a>
+                    <span id="sidebarUserName" style="display: inline-block; vertical-align: middle; font-weight:600; color:navy; margin-left: 10px; position: relative; top: -11px;">
+
+                    </span>
+                </div>
+
+                <div style="position:relative; display:inline-block; width:100%;">
+                    <a href="#" class="nav-item logout-item">
+                        <span class="nav-icon">🚪</span>
+                        <span class="nav-text" style="position: relative; top: -0px;">Logout</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="header">
+                <span id="page-title">PROFILE</span>
+            </div>
+
+            <div class="content-body">
+                <div class="profile-card">
+                    
+                    <div class="profile-header">
+
+                        <div class="profile-avatar">
+
+                            <img id="profileImage"
+                                 src="default-profile.png"
+                                 alt="Profile"
+                                 style="cursor:pointer;">
+
+                            <div class="edit-icon" id="editImageBtn">✏️</div>
+                            
+                            <input type="file" id="imageUpload" accept="image/*" hidden>
+                        </div>
+
+                        <div class="profile-info">
+                            <!-- ✅ Populated by JS from Supabase — no hardcoded values -->
+                            <h2></h2>
+                            <p id="profileEmailDisplay"></p>
+                        </div>
+
+                        <button class="edit-btn">✏️ Edit</button>
+
+                    </div>
+                    
+                    <hr class="divider">
+                    
+                    <div class="profile-details">
+                        <div class="detail-group">
+                            <div class="detail-item">
+                                <label>First Name:</label>
+                                <!-- ✅ No hardcoded value — filled by JS -->
+                                <input type="text" id="firstName" value="" readonly>
+                            </div>
+                            <div class="detail-item">
+                                <label>Last Name:</label>
+                                <input type="text" id="lastName" value="" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-group">
+                            <div class="detail-item">
+                                <!-- ✅ Changed from username to email — matches users table -->
+                                <label>Email:</label>
+                                <input type="email" id="email" value="" readonly
+                                       style="background-color:#f0f0f0; cursor:not-allowed;"
+                                       title="Email cannot be changed here.">
+                            </div>
+                            <div class="detail-item">
+                                <label>Contact Number:</label>
+                                <input type="text" id="contactNumber" value="" readonly>
+                            </div>
+                        </div>
+                        
+                        <div class="email-section">
+                            <h3>My Email Address</h3>
+                            <div class="email-display">
+                                <span class="email-icon">✉️</span>
+                                <!-- ✅ ID added so JS keeps this in sync -->
+                                <span id="emailSectionDisplay"></span>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script src="profile_sync.js"></script> 
+    <script src="profile_page.js"></script>
+</body>
+</html>

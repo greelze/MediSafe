@@ -1,0 +1,299 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: #f8f9fa;
+    color: #1a1a1a;
+}
+
+.app-container {
+    display: flex;
+    min-height: 100vh;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    width: 280px;
+    background: #ffffff;
+    border-right: 1px solid #e5e7eb;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 0;
+    position: fixed;
+    height: 100vh;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.logo-section {
+    padding: 0 24px 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.logo {
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, #05318a 0%, #4a9fd8 100%);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+}
+
+.brand-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.nav-section {
+    flex: 1;
+    padding: 0 16px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    margin-bottom: 4px;
+    border-radius: 12px;
+    text-decoration: none;
+    color: #6b7280;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.nav-item:hover {
+    background: #f3f4f6;
+    color: #1a1a1a;
+}
+
+.nav-item.active {
+    background: linear-gradient(135deg, #05318a 0%, #4a9fd8 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(74, 159, 216);
+}
+
+.nav-icon {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+}
+
+.profile-section {
+    padding: 16px 24px;
+    border-top: 1px solid #e5e7eb;
+    margin-top: auto;
+}
+
+.profile-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    text-decoration: none;
+    transition: background 0.2s ease;
+    margin-bottom: 8px;
+}
+
+.profile-link:hover {
+    background: #f3f4f6;
+}
+
+.avatar-placeholder {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #05318a 0%, #4a9fd8 100%);
+}
+
+.logout-item {
+    color: #05318a;
+}
+
+.logout-item:hover {
+    background: #fef2f2;
+    color: #05318a;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    margin-left: 280px;
+    padding: 32px 40px;
+}
+
+.header {
+    margin-bottom: 32px;
+}
+
+#page-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+/* Metrics Cards */
+.metrics-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 24px;
+    margin-bottom: 32px;
+}
+
+.metric-card {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #e5e7eb;
+    transition: all 0.3s ease;
+}
+
+.metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.metric-card.temperature {
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+    border: 1px solid #ffe5e8;
+}
+
+.metric-card.humidity {
+    background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
+    border: 1px solid #dbeafe;
+}
+
+.metric-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.metric-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+}
+
+.temperature .metric-icon {
+    background: linear-gradient(135deg, #F77F00 0%, #ff4d6d 100%);
+}
+
+.humidity .metric-icon {
+    background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+}
+
+.metric-label {
+    font-size: 14px;
+    color: #6b7280;
+    font-weight: 500;
+}
+
+.metric-value {
+    font-size: 36px;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+/* Chart Container */
+.chart-container-wrapper {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+}
+
+.chart-card {
+    background: white;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    border: 1px solid #e5e7eb;
+}
+
+.chart-header {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1a1a1a;
+    margin-bottom: 24px;
+}
+
+.chart-area {
+    position: relative;
+    height: 300px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .sidebar {
+        width: 240px;
+    }
+
+    .main-content {
+        margin-left: 240px;
+        padding: 24px;
+    }
+}
+
+@media (max-width: 768px) {
+    .sidebar {
+        transform: translateX(-100%);
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 20px;
+    }
+
+    .metrics-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.ai-card {
+    background: linear-gradient(135deg, #f3e8ff 0%, #ffffff 100%);
+    border: 1px solid #e9d5ff;
+}
+
+.ai-card .metric-icon {
+    background: linear-gradient(135deg, #8b5cf6 0%, #a855f7 100%);
+    color: white;
+}
+
+.trend-label {
+    margin-top: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 6px 10px;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+/* Dynamic colors injected by JavaScript based on the trend */
+.trend-rising { 
+    background: #fee2e2; 
+    color: #dc2626; 
+}
+.trend-falling { 
+    background: #dbeafe; 
+    color: #2563eb; 
+}
+.trend-stable { 
+    background: #f3f4f6; 
+    color: #4b5563; 
+}

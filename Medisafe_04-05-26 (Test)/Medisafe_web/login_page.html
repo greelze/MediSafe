@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediSafe Login</title>
+  <link rel="stylesheet" href="login_page.css" />
+  <link rel="stylesheet" href="theme.css">
+  
+  
+</head>
+<body>
+  <div class="container">
+    <!-- LEFT SIDE -->
+    <div class="left-side">
+      <h1 class="app-title">MediSafe</h1>
+      <img src="assets/image.jpg" alt="MediSafe logo" class="logo" />
+      <h1 class="app-title">Welcome Back!</h1>
+    </div>
+
+    <!-- RIGHT SIDE -->
+    <div class="right-side">
+      <div class="login-card">
+        <h2 class="login-title">Login</h2>
+        <label>Email</label>
+        <input type="email" id="email" placeholder="Enter your email" />
+        <label>Password</label>
+        <div class="password-field">
+          <input type="password" id="password" placeholder="Enter your password" />
+          <button type="button" id="password-toggle" class="toggle-password" aria-label="Show password" data-showing="false">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+
+        </div>
+        <a href="#" class="forgot-password">Forgot Password?</a>
+        <button class="login-btn" id="login-btn">Login</button>
+        <button class="email-btn" id="email-btn">
+          Sign in with
+          <img src="assets/google_logo.png" alt="Google Logo" style="height: 1em; width: auto;" />
+        </button>
+        <p class="signup-text">
+          Don't have an account? 
+          <a href="signup_page.html" id="signup-link">Sign Up</a>
+        </p>
+      </div>
+    </div>
+    <div id="verificationModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Google Sign In</h2>
+        <p>Enter your email address:</p>
+        <input type="email" id="googleEmail" placeholder="example@gmail.com" class="google-email-input" />
+        <p id="emailError" class="error-message"></p>
+        <button id="sendCodeBtn" class="send-code-btn">Send Verification Code</button>
+        <button id="cancelGoogleBtn" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
+
+    <div id="codeVerificationModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Verify Your Email</h2>
+        <p>A 6-digit verification code has been sent to:</p>
+        <p id="verificationEmail" class="email-display"></p>
+        <label>Enter 6-digit Code:</label>
+        <input type="text" id="verificationCode" placeholder="000000" maxlength="6" class="code-input" />
+        <button id="verifyBtn" class="verify-btn">Verify</button>
+        <button id="cancelCodeBtn" class="cancel-btn">Cancel</button>
+        <p id="verificationError" class="error-message"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAPTCHA Modal -->
+  <div id="captchaModal" class="modal hidden">
+    <div class="modal-content captcha-modal">
+      <button class="modal-close" id="captchaClose" aria-label="Close security verification">×</button>
+      <div class="captcha-header">
+        <div class="captcha-title-row">
+          <div class="captcha-icon">🔐</div>
+          <h2 id="captchaTitle">Security Verification</h2>
+          
+        </div>
+        <p class="captcha-helper">This verification helps protect your account from automated Login-in attempts.</p>
+      </div>
+      
+      <div id="captchaContainer" class="captcha-container" role="group" aria-labelledby="captchaTitle">
+        <p class="captcha-subtitle">Drag each icon to its matching target.</p>
+        <div id="captchaStatus" class="captcha-status" aria-live="polite" role="status">Match all three icons to continue.</div>
+
+          <div class="draggables" aria-label="Drag icons to targets" role="list">
+            <button type="button" class="draggable" draggable="true" data-icon="pill" tabindex="0" aria-label="Draggable pill icon">💊</button>
+            <button type="button" class="draggable" draggable="true" data-icon="doctor" tabindex="0" aria-label="Draggable doctor icon">👨‍⚕️</button>
+            <button type="button" class="draggable" draggable="true" data-icon="heart" tabindex="0" aria-label="Draggable heart icon">❤️</button>
+          </div>
+            
+          <div class="match-game">
+          <div class="targets" aria-label="Matching targets" role="list">
+            <div class="target-slot" role="listitem" data-icon="pill" draggable="false" tabindex="0" aria-label="Drop target for pill icon">💊</div>
+            <div class="target-slot" role="listitem" data-icon="doctor" draggable="false" tabindex="0" aria-label="Drop target for doctor icon">👨‍⚕️</div>
+            <div class="target-slot" role="listitem" data-icon="heart" draggable="false" tabindex="0" aria-label="Drop target for heart icon">❤️</div>
+          </div>
+        </div>
+        <div id="captchaCounter" class="captcha-counter" aria-live="polite">Attempts left: 3</div>
+        <div class="captcha-footer">
+          <button id="refreshCaptcha" class="refresh-btn" aria-label="Refresh verification challenge">Refresh</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { supabase } from './assets/supabaseClient.js';
+
+    let googleEmail = null;
+    let verificationCode = null;
+    let isGoogleFlow = false;
+
+    const openEye = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>';
+    const closedEye = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.99902 3L20.999 21M9.8433 9.91364C9.32066 10.4536 8.99902 11.1892 8.99902 12C8.99902 13.6569 10.3422 15 12 15C12.8215 15 13.5667 14.669 14.1086 14.133M6.49902 6.64715C4.59972 7.90034 3.15305 9.78394 2.45703 12C3.73128 16.0571 7.52159 19 11.9992 19C13.9881 19 15.8414 18.4194 17.3988 17.4184M10.999 5.04939C11.328 5.01673 11.6617 5 11.9992 5C16.4769 5 20.2672 7.94291 21.5414 12C21.2607 12.894 20.8577 13.7338 20.3522 14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    // Toggle password visibility
+    function togglePassword(id) {
+      console.log('Toggle clicked for', id);
+      const input = document.getElementById(id);
+      const button = document.querySelector('#' + id + ' + .toggle-password');
+      const isShowing = button.getAttribute('data-showing') === 'true';
+      
+      input.type = isShowing ? 'password' : 'text';
+      button.innerHTML = isShowing ? openEye : closedEye;
+      button.setAttribute('data-showing', !isShowing);
+      button.setAttribute('aria-label', isShowing ? 'Show password' : 'Hide password');
+    }
+
+
+    function configurePasswordToggle(fieldId) {
+      const input = document.getElementById(fieldId);
+      const button = document.querySelector('#' + fieldId + ' + .toggle-password');
+      if (!input || !button) return;
+
+      // Set initial state
+      button.innerHTML = openEye;
+      button.setAttribute('data-showing', 'false');
+      button.style.display = 'block';
+      button.setAttribute('aria-label', 'Show password');
+
+      // Add click listener
+      button.addEventListener('click', () => togglePassword(fieldId));
+
+      // Optional: hide button if empty (but keep always visible per plan)
+      const updateVisibility = () => {
+        button.style.display = input.value.trim() ? 'block' : 'none';
+      };
+      input.addEventListener('input', updateVisibility);
+    }
+
+    configurePasswordToggle('password');
+
+
+
+    document.getElementById('signup-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      window.location.href = 'signup_page.html';
+    });
+
+let currentEmail = '';
+    let attemptsLeft = 3;
+    let matches = 0;
+    let selectedDraggable = null;
+
+    function shuffleArray(array) {
+      return array.sort(() => Math.random() - 0.5);
+    }
+
+    function setCaptchaMessage(message, type = '') {
+      const status = document.getElementById('captchaStatus');
+      status.textContent = message;
+      status.classList.toggle('success', type === 'success');
+      status.classList.toggle('error', type === 'error');
+    }
+
+    function initIconMatch() {
+      const icons = ['pill', 'doctor', 'heart'];
+      const draggables = Array.from(document.querySelectorAll('.draggable'));
+      const shuffledIcons = shuffleArray([...icons]);
+
+      draggables.forEach((draggable, index) => {
+        const icon = shuffledIcons[index];
+        draggable.dataset.icon = icon;
+        draggable.textContent = icon === 'pill' ? '💊' : icon === 'doctor' ? '👨‍⚕️' : '❤️';
+        draggable.classList.remove('matched', 'selected');
+        draggable.disabled = false;
+        draggable.setAttribute('aria-pressed', 'false');
+      });
+
+      const targets = Array.from(document.querySelectorAll('.target-slot'));
+      targets.forEach(target => {
+        target.classList.remove('matched');
+        target.removeAttribute('aria-disabled');
+        target.style.borderColor = '';
+      });
+
+      matches = 0;
+      attemptsLeft = 3;
+      selectedDraggable = null;
+      document.getElementById('captchaCounter').textContent = `Attempts left: ${attemptsLeft}`;
+      setCaptchaMessage('Match all three icons to continue.');
+    }
+
+    function checkIconMatch(dragged, target) {
+      return dragged.dataset.icon === target.dataset.icon;
+    }
+
+    function clearSelection() {
+      selectedDraggable = null;
+      document.querySelectorAll('.draggable.selected').forEach(d => {
+        d.classList.remove('selected');
+        d.setAttribute('aria-pressed', 'false');
+      });
+    }
+
+    function selectDraggable(draggable) {
+      if (!draggable || draggable.disabled) {
+        return;
+      }
+      clearSelection();
+      selectedDraggable = draggable;
+      draggable.classList.add('selected');
+      draggable.setAttribute('aria-pressed', 'true');
+      setCaptchaMessage('Now drop this icon on the matching target.');
+    }
+
+    function handleTargetDrop(target, draggedIcon) {
+      const dragged = draggedIcon
+        ? document.querySelector(`.draggable[data-icon="${draggedIcon}"]`)
+        : selectedDraggable;
+
+      if (!dragged || dragged.disabled) {
+        return;
+      }
+
+      if (checkIconMatch(dragged, target)) {
+        target.classList.add('matched');
+        target.setAttribute('aria-disabled', 'true');
+        dragged.classList.add('matched');
+        dragged.disabled = true;
+        dragged.setAttribute('aria-pressed', 'false');
+        matches += 1;
+        clearSelection();
+        setCaptchaMessage(`${matches}/3 matched!`, 'success');
+
+        if (matches === 3) {
+          setCaptchaMessage('Perfect! Verification complete.', 'success');
+          setTimeout(performLogin, 900);
+        }
+      } else {
+        attemptsLeft -= 1;
+        setCaptchaMessage(attemptsLeft > 0 ? 'Not a match. Try again.' : 'No attempts left. Refresh to try again.', 'error');
+        clearSelection();
+        document.getElementById('captchaCounter').textContent = `Attempts left: ${attemptsLeft}`;
+
+        if (attemptsLeft <= 0) {
+          document.querySelectorAll('.draggable').forEach(d => d.disabled = true);
+        }
+      }
+    }
+
+    function showCaptcha(email) {
+      currentEmail = email;
+      document.getElementById('captchaModal').classList.remove('hidden');
+      initIconMatch();
+    }
+
+    function hideCaptcha() {
+      document.getElementById('captchaModal').classList.add('hidden');
+      clearSelection();
+    }
+
+
+
+
+
+    document.addEventListener('DOMContentLoaded', function() {
+      // Icon matching CAPTCHA logic
+      const draggables = document.querySelectorAll('.draggable');
+      const targets = document.querySelectorAll('.target-slot');
+
+      // Drag & Drop for icon matching
+      draggables.forEach(draggable => {
+        draggable.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', draggable.dataset.icon);
+          draggable.classList.add('dragging');
+        });
+
+        draggable.addEventListener('dragend', () => {
+          draggable.classList.remove('dragging');
+        });
+
+        draggable.addEventListener('click', () => selectDraggable(draggable));
+        draggable.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            selectDraggable(draggable);
+          }
+        });
+      });
+
+      targets.forEach(target => {
+        target.addEventListener('dragover', (e) => {
+          e.preventDefault();
+        });
+
+        target.addEventListener('drop', (e) => {
+          e.preventDefault();
+          const draggedIcon = e.dataTransfer.getData('text/plain');
+          handleTargetDrop(target, draggedIcon);
+        });
+
+        target.addEventListener('click', () => {
+          handleTargetDrop(target);
+        });
+
+        target.addEventListener('keydown', (e) => {
+          if ((e.key === 'Enter' || e.key === ' ') && selectedDraggable) {
+            e.preventDefault();
+            handleTargetDrop(target);
+          }
+        });
+      });
+
+      document.getElementById('refreshCaptcha').addEventListener('click', () => {
+        initIconMatch();
+      });
+
+      draggables.forEach(draggable => {
+        draggable.addEventListener('touchstart', () => {
+          draggable.classList.add('dragging');
+        });
+        
+        draggable.addEventListener('touchend', () => {
+          draggable.classList.remove('dragging');
+        });
+
+        draggable.addEventListener('touchcancel', () => {
+          draggable.classList.remove('dragging');
+        });
+      });
+    });
+
+
+
+
+
+    async function performLogin() {
+      const password = document.getElementById('password').value;
+      const { data , error } = await supabase.auth.signInWithPassword({ 
+        email: currentEmail, 
+        password 
+      });
+      
+      if (error) {
+        alert('Login error: ' + error.message);
+        hideCaptcha();
+        return;
+      }
+
+      // Track login count
+      let loginCount = parseInt(localStorage.getItem(`loginCount_${currentEmail}`) || '0');
+      loginCount++;
+      localStorage.setItem(`loginCount_${currentEmail}`, loginCount.toString());
+      localStorage.setItem('currentUserEmail', currentEmail);
+
+      hideCaptcha();
+      window.location.href = 'dashboard_page.html';
+    }
+
+    document.getElementById('captchaClose').addEventListener('click', hideCaptcha);
+      
+      document.getElementById('login-btn').addEventListener('click', function() {
+        const email = document.getElementById('email').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!email || !password) {
+          alert('Please enter both email and password');
+          return;
+        }
+
+        // Always show CAPTCHA first
+        showCaptcha(email);
+      });
+    async function sendVerificationCodeViaEmail(email) {
+      try {
+        const { data, error } = await supabase.auth.signInWithOtp({
+          email: email
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('OTP sent successfully to:', email);
+        return true;
+      } catch (error) {
+        console.error('Error sending OTP:', error);
+        document.getElementById('emailError').textContent = 'Failed to send code. Please try again.';
+        return false;
+      }
+    }
+
+    async function verifyOTPCode(email, code) {
+      try {
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: email,
+          token: code,
+          type: 'email'
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        console.log('OTP verified successfully');
+        return true;
+      } catch (error) {
+        console.error('Error verifying OTP:', error);
+        return false;
+      }
+    }
+
+    document.getElementById('email-btn').addEventListener('click', function() {
+      isGoogleFlow = false;
+      showEmailModal();
+    });
+
+    function showEmailModal() {
+      document.getElementById('verificationModal').classList.remove('hidden');
+      document.getElementById('googleEmail').value = '';
+      document.getElementById('emailError').textContent = '';
+      document.getElementById('googleEmail').focus();
+    }
+
+    function hideEmailModal() {
+      document.getElementById('verificationModal').classList.add('hidden');
+    }
+
+    document.getElementById('sendCodeBtn').addEventListener('click', function() {
+      const email = document.getElementById('googleEmail').value.trim();
+      
+      if (!email) {
+        document.getElementById('emailError').textContent = 'Please enter an email address';
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        document.getElementById('emailError').textContent = 'Please enter a valid email address';
+        return;
+      }
+
+      googleEmail = email;
+
+      const btn = document.getElementById('sendCodeBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+      
+      sendVerificationCodeViaEmail(email).then(success => {
+        if (success) {
+          hideEmailModal();
+          showCodeVerificationModal();
+        }
+        btn.disabled = false;
+        btn.textContent = 'Send Verification Code';
+      });
+    });
+
+    document.getElementById('googleEmail').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        document.getElementById('sendCodeBtn').click();
+      }
+    });
+
+    document.getElementById('cancelGoogleBtn').addEventListener('click', function() {
+      hideEmailModal();
+      isGoogleFlow = false;
+    });
+
+    function showCodeVerificationModal() {
+      document.getElementById('codeVerificationModal').classList.remove('hidden');
+      document.getElementById('verificationEmail').textContent = googleEmail;
+      document.getElementById('verificationCode').value = '';
+      document.getElementById('verificationError').textContent = '';
+      document.getElementById('verificationCode').focus();
+    }
+
+    function hideCodeVerificationModal() {
+      document.getElementById('codeVerificationModal').classList.add('hidden');
+      googleEmail = null;
+      verificationCode = null;
+    }
+    document.getElementById('verifyBtn').addEventListener('click', function() {
+      const enteredCode = document.getElementById('verificationCode').value;
+
+      if (!enteredCode || enteredCode.length !== 6) {
+        document.getElementById('verificationError').textContent = 'Please enter a valid 6-digit code';
+        return;
+      }
+
+      const btn = document.getElementById('verifyBtn');
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+
+      verifyOTPCode(googleEmail, enteredCode).then(success => {
+        if (success) {
+          document.getElementById('verificationError').textContent = '';
+          alert('Email verified successfully!');
+          hideCodeVerificationModal();
+
+          // ✅ Save email so profile_page.js knows who logged in
+          localStorage.setItem('currentUserEmail', googleEmail);
+
+          window.location.href = 'dashboard_page.html';
+        } else {
+          document.getElementById('verificationError').textContent = 'Invalid code. Please try again.';
+        }
+        btn.disabled = false;
+        btn.textContent = 'Verify';
+      });
+    });
+
+  
+    // Cancel code verification
+    document.getElementById('cancelCodeBtn').addEventListener('click', function() {
+      hideCodeVerificationModal();
+      showEmailModal();
+    });
+
+    // Allow Enter key to submit verification code
+    document.getElementById('verificationCode').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        document.getElementById('verifyBtn').click();
+      }
+    });
+  </script>
+
+  <script src="theme.js"></script>
+</body>
+</html>

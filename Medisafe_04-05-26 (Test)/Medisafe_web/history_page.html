@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Threshold History — MediSafe</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="dashboard_page.css">
+  <link rel="stylesheet" href="history_page.css">
+  <link rel="stylesheet" href="theme.css">
+
+  <style>
+    /* UV stat box icon */
+    .stat-icon.uv { background: rgba(251, 146, 60, 0.15); color: #f97316; }
+
+    /* ── Export modal: landscape layout ─────────────────────── */
+    .export-modal-box {
+      max-width: 780px !important;
+      width: 90vw !important;
+    }
+    .export-modal-body {
+      display: flex;
+      gap: 24px;
+      align-items: flex-start;
+    }
+    .export-col { flex: 1; min-width: 0; }
+    .export-col-left  { flex: 0 0 310px; border-right: 1px solid var(--border-color, #e5e7eb); padding-right: 24px; }
+    .export-col-right { flex: 1; }
+
+    /* Export range cards — vertical stack on right column */
+    .export-range-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 0;
+    }
+    .export-range-card { cursor: pointer; }
+    .export-range-card input[type="radio"] { display: none; }
+    .export-range-inner {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border: 2px solid var(--border-color, #e5e7eb);
+      border-radius: 10px;
+      transition: border-color 0.2s, background 0.2s;
+      background: var(--input-bg, #f9fafb);
+    }
+    .export-range-card input:checked + .export-range-inner {
+      border-color: #FF0531;
+      background: rgba(255, 5, 49, 0.05);
+    }
+    .export-range-card.recommended .export-range-inner {
+      border-color: #10b981;
+      background: rgba(16, 185, 129, 0.05);
+    }
+    .export-range-card.recommended input:checked + .export-range-inner {
+      border-color: #059669;
+      background: rgba(5, 150, 105, 0.1);
+    }
+    .export-range-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .export-range-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary, #111); flex: 1; }
+    .export-range-desc { font-size: 0.7rem; color: var(--text-secondary, #6b7280); white-space: nowrap; }
+
+    /* Security recommendation note */
+    .export-security-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-left: 4px solid #f59e0b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 16px;
+      font-size: 0.8rem;
+      color: #92400e;
+    }
+    .security-note-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+    .security-note-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.5; }
+    .security-note-text strong { display: block; font-size: 0.82rem; margin-bottom: 2px; color: #78350f; }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo-section">
+        <div class="logo">🏥</div>
+        <div class="brand-name">MediSafe</div>
+      </div>
+
+      <div class="nav-section">
+        <a href="dashboard_page.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="history_page.html" class="nav-item active">
+          <span class="nav-icon">🕒</span>
+          <span class="nav-text">Threshold History</span>
+        </a>
+        <a href="analytics_page.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Analytics</span>
+        </a>
+        <a href="audit_trail_local.html" class="nav-item">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">Audit Trail</span>
+        </a>
+        <a href="monitoring_log.html" class="nav-item">
+                    <span class="nav-icon">🩺</span>
+                    <span class="nav-text">Monitoring Log</span>
+                </a>
+        <a href="settings_page.html" class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </a>
+      </div>
+      
+      <div class="profile-section">
+        <div style="position:relative; display:inline-block; width:100%;">
+          <a href="profile_page.html" class="profile-link" style="display:inline-block;">
+            <div class="avatar-placeholder">
+              <img id="sidebarProfileImage"
+                   src="default-profile.png"
+                   alt="Profile"
+                   style="width:100%; height:100%; border-radius:50%; object-fit:cover;">
+            </div>
+          </a>
+          <span id="sidebarUserName" style="display: inline-block; vertical-align: middle; font-weight:600; color:navy; margin-left: 10px; position: relative; top: -11px;"></span>
+        </div>
+        <div style="position:relative; display:inline-block; width:100%;">
+          <a href="login_page.html" class="nav-item logout-item">
+            <span class="nav-icon">🚪</span>
+            <span class="nav-text" style="position: relative; top: -0px;">Logout</span>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="header">
+        <span id="page-title">Threshold History</span>
+        <div class="header-actions">
+          <button class="filter-btn">
+            <span>📅</span>
+            <span>Filter</span>
+          </button>
+          <button class="export-btn">
+            <span>📥</span>
+            <span>Export</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="content-body">
+        <!-- Stats Overview -->
+        <div class="stats-overview">
+          <div class="stat-box">
+            <div class="stat-icon warning">⚠️</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statTempAlerts">—</div>
+              <div class="stat-label">Temperature Alerts</div>
+            </div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-icon info">💧</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statHumidAlerts">—</div>
+              <div class="stat-label">Humidity Alerts</div>
+            </div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-icon uv">☀️</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statUVAlerts">—</div>
+              <div class="stat-label">UV Alerts</div>
+            </div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-icon success">✓</div>
+            <div class="stat-info">
+              <div class="stat-value" id="statNormalReadings">—</div>
+              <div class="stat-label">Normal Readings</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History Table -->
+        <div class="table-card">
+          <div class="table-card-header">
+            <h2>Recent Activity</h2>
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" placeholder="Search history..." id="searchInput">
+              </div>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>
+                    <div class="col-sort-wrapper">
+                      <span class="col-th-label">Date</span>
+                      <button class="col-sort-icon-btn" data-col="0" data-type="date" title="Sort by Date">
+                        <svg class="sort-svg" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 1v12M5 1L2 4M5 1l3 3M5 13l-3-3M5 13l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
+                      <div class="col-sort-dropdown">
+                        <button class="col-sort-option" data-dir="asc"><span>↑</span> Sort Ascending</button>
+                        <button class="col-sort-option" data-dir="desc"><span>↓</span> Sort Descending</button>
+                      </div>
+                    </div>
+                  </th>
+                  <th>
+                    <div class="col-sort-wrapper">
+                      <span class="col-th-label">Time</span>
+                      <button class="col-sort-icon-btn" data-col="1" data-type="time" title="Sort by Time">
+                        <svg class="sort-svg" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 1v12M5 1L2 4M5 1l3 3M5 13l-3-3M5 13l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
+                      <div class="col-sort-dropdown">
+                        <button class="col-sort-option" data-dir="asc"><span>↑</span> Sort Ascending</button>
+                        <button class="col-sort-option" data-dir="desc"><span>↓</span> Sort Descending</button>
+                      </div>
+                    </div>
+                  </th>
+                  <th>
+                    <div class="col-sort-wrapper">
+                      <span class="col-th-label">Temperature</span>
+                      <button class="col-sort-icon-btn" data-col="2" data-type="number" title="Sort by Temperature">
+                        <svg class="sort-svg" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 1v12M5 1L2 4M5 1l3 3M5 13l-3-3M5 13l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
+                      <div class="col-sort-dropdown">
+                        <button class="col-sort-option" data-dir="asc"><span>↑</span> Sort Ascending</button>
+                        <button class="col-sort-option" data-dir="desc"><span>↓</span> Sort Descending</button>
+                      </div>
+                    </div>
+                  </th>
+                  <th>
+                    <div class="col-sort-wrapper">
+                      <span class="col-th-label">Humidity</span>
+                      <button class="col-sort-icon-btn" data-col="3" data-type="number" title="Sort by Humidity">
+                        <svg class="sort-svg" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 1v12M5 1L2 4M5 1l3 3M5 13l-3-3M5 13l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
+                      <div class="col-sort-dropdown">
+                        <button class="col-sort-option" data-dir="asc"><span>↑</span> Sort Ascending</button>
+                        <button class="col-sort-option" data-dir="desc"><span>↓</span> Sort Descending</button>
+                      </div>
+                    </div>
+                  </th>
+                  <th>
+                    <div class="col-sort-wrapper">
+                      <span class="col-th-label">UV Index</span>
+                      <button class="col-sort-icon-btn" data-col="4" data-type="number" title="Sort by UV Index">
+                        <svg class="sort-svg" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 1v12M5 1L2 4M5 1l3 3M5 13l-3-3M5 13l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
+                      <div class="col-sort-dropdown">
+                        <button class="col-sort-option" data-dir="asc"><span>↑</span> Sort Ascending</button>
+                        <button class="col-sort-option" data-dir="desc"><span>↓</span> Sort Descending</button>
+                      </div>
+                    </div>
+                  </th>
+                  <th>
+                    <div class="col-sort-wrapper">
+                      <span class="col-th-label">Status</span>
+                      <button class="col-sort-icon-btn" data-col="5" data-type="text" title="Sort by Status">
+                        <svg class="sort-svg" viewBox="0 0 10 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M5 1v12M5 1L2 4M5 1l3 3M5 13l-3-3M5 13l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </button>
+                      <div class="col-sort-dropdown">
+                        <button class="col-sort-option" data-dir="asc"><span>↑</span> Sort Ascending</button>
+                        <button class="col-sort-option" data-dir="desc"><span>↓</span> Sort Descending</button>
+                      </div>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="historyTableBody">
+                <tr>
+                  <td><span class="date-badge">Jan 26, 2026</span></td>
+                  <td>14:23:15</td>
+                  <td><span class="temp-value high">25.2°C</span></td>
+                  <td><span class="humidity-value">52.1%</span></td>
+                  <td><span class="uv-value moderate">3.4</span></td>
+                  <td><span class="status-badge warning">High Temp</span></td>
+                </tr>
+                <tr>
+                  <td><span class="date-badge">Jan 26, 2026</span></td>
+                  <td>13:45:32</td>
+                  <td><span class="temp-value">23.1°C</span></td>
+                  <td><span class="humidity-value">50.4%</span></td>
+                  <td><span class="uv-value low">1.2</span></td>
+                  <td><span class="status-badge normal">Normal</span></td>
+                </tr>
+                <tr>
+                  <td><span class="date-badge">Jan 26, 2026</span></td>
+                  <td>12:15:08</td>
+                  <td><span class="temp-value low">18.5°C</span></td>
+                  <td><span class="humidity-value high">65.8%</span></td>
+                  <td><span class="uv-value high">7.8</span></td>
+                  <td><span class="status-badge alert">Low Temp / High Humidity</span></td>
+                </tr>
+                <tr>
+                  <td><span class="date-badge">Jan 25, 2026</span></td>
+                  <td>23:55:47</td>
+                  <td><span class="temp-value">22.8°C</span></td>
+                  <td><span class="humidity-value">48.9%</span></td>
+                  <td><span class="uv-value low">0.5</span></td>
+                  <td><span class="status-badge normal">Normal</span></td>
+                </tr>
+                <tr>
+                  <td><span class="date-badge">Jan 25, 2026</span></td>
+                  <td>18:30:22</td>
+                  <td><span class="temp-value">23.4°C</span></td>
+                  <td><span class="humidity-value low">35.2%</span></td>
+                  <td><span class="uv-value very-high">9.1</span></td>
+                  <td><span class="status-badge warning">Low Humidity</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="table-footer">
+            <div class="rows-info">Showing 1-5 of 176 entries</div>
+            <div class="pagination">
+              <button class="page-btn" disabled>Previous</button>
+              <button class="page-btn active">1</button>
+              <button class="page-btn">2</button>
+              <button class="page-btn">3</button>
+              <button class="page-btn">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Toast Notification Element -->
+  <div class="toast" id="toast">
+    <span class="toast-icon" id="toastIcon"></span>
+    <span class="toast-message" id="toastMessage"></span>
+  </div>
+
+  <!-- ✅ Confirm Remove Modal -->
+  <div class="modal-overlay" id="confirmModal">
+    <div class="modal-box" style="max-width: 400px;">
+      <div class="modal-header">
+        <h3>🗑️ Remove Entry</h3>
+        <button class="modal-close" id="closeConfirmModal" title="Close">✕</button>
+      </div>
+      <p style="font-size: 0.95rem; color: var(--text-secondary); margin-bottom: 8px;">
+        Are you sure you want to remove this entry?
+      </p>
+      <p id="confirmEntryDetails" style="font-size: 0.88rem; color: var(--text-secondary); background: var(--input-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px 14px; margin-bottom: 4px;"></p>
+      <p style="font-size: 0.8rem; color: #e74c3c; margin-top: 10px;">⚠️ This action cannot be undone.</p>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelConfirmBtn">Cancel</button>
+        <button class="btn-confirm-remove" id="confirmRemoveBtn">Yes, Remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ All Scripts -->
+  <script>
+    // ── Safe range constants ──────────────────────────────────
+    const TEMP_MIN  = 15;
+    const TEMP_MAX  = 25;
+    const HUMID_MIN = 30;
+    const HUMID_MAX = 60;
+
+    const confirmModal = document.getElementById('confirmModal');
+    const tableBody    = document.getElementById('historyTableBody');
+
+    const closeConfirmBtn  = document.getElementById('closeConfirmModal');
+    const cancelConfirmBtn = document.getElementById('cancelConfirmBtn');
+    const confirmRemoveBtn = document.getElementById('confirmRemoveBtn');
+    const confirmDetails   = document.getElementById('confirmEntryDetails');
+
+    let removingRow = null;
+
+    // ── Toast function ────────────────────────────────────────
+    let toastTimer = null;
+    function showToast(message, type) {
+      const toast     = document.getElementById('toast');
+      const toastIcon = document.getElementById('toastIcon');
+      const toastMsg  = document.getElementById('toastMessage');
+
+      toastIcon.textContent = type === 'success' ? '✅' : '❌';
+      toastMsg.textContent  = message;
+      toast.className       = `toast toast-${type} toast-show`;
+
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('toast-show');
+        toast.classList.add('toast-hide');
+        setTimeout(() => { toast.className = 'toast'; }, 400);
+      }, 3000);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────
+
+    function formatDate(dateStr) {
+      const [y, m, d] = dateStr.split('-');
+      const months = ['Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `${months[+m-1]} ${+d}, ${y}`;
+    }
+
+    function parseDateToInput(displayDate) {
+      const months = { Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',
+                       Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12' };
+      const parts = displayDate.split(' ');
+      const mon = months[parts[0]];
+      const day = parts[1].replace(',','').padStart(2,'0');
+      const yr  = parts[2];
+      return `${yr}-${mon}-${day}`;
+    }
+
+    function getTempClass(val) {
+      if (val > TEMP_MAX) return 'high';
+      if (val < TEMP_MIN) return 'low';
+      return '';
+    }
+
+    function getHumidClass(val) {
+      if (val > HUMID_MAX) return 'high';
+      if (val < HUMID_MIN) return 'low';
+      return '';
+    }
+
+    // ── Close all open sort dropdowns when clicking outside ───
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.col-sort-wrapper') && !e.target.closest('.dots-wrapper')) {
+        document.querySelectorAll('.col-sort-dropdown.open').forEach(d => d.classList.remove('open'));
+        document.querySelectorAll('.col-sort-icon-btn.active').forEach(b => b.classList.remove('active'));
+      }
+    });
+
+    // ── Confirm remove ────────────────────────────────────────
+
+    confirmRemoveBtn.addEventListener('click', () => {
+      if (removingRow) {
+        confirmModal.classList.remove('active');
+        removingRow.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+        removingRow.style.opacity    = '0';
+        removingRow.style.transform  = 'translateX(20px)';
+        setTimeout(() => {
+          removingRow.remove();
+          removingRow = null;
+          showToast('Entry removed successfully.', 'success');
+        }, 300);
+      }
+    });
+
+    [closeConfirmBtn, cancelConfirmBtn].forEach(btn =>
+      btn.addEventListener('click', () => {
+        confirmModal.classList.remove('active');
+        removingRow = null;
+      })
+    );
+
+    confirmModal.addEventListener('click', e => {
+      if (e.target === confirmModal) {
+        confirmModal.classList.remove('active');
+        removingRow = null;
+      }
+    });
+
+    // ── Per-column Sort ───────────────────────────────────────
+
+    // Snapshot the original row order once the DOM is ready.
+    // Always sort from this baseline so columns never interfere.
+    let _originalRows = null;
+    function getOriginalRows() {
+      if (!_originalRows) {
+        const tbody = document.getElementById('historyTableBody');
+        _originalRows = Array.from(tbody.querySelectorAll('tr'));
+      }
+      return _originalRows;
+    }
+
+    // Re-snapshot whenever history.js re-renders the table (pagination / load)
+    const _tbodyObserver = new MutationObserver(() => { _originalRows = null; });
+    _tbodyObserver.observe(document.getElementById('historyTableBody'), { childList: true });
+
+    function getCellValue(row, colIndex, type) {
+      const cell = row.cells[colIndex];
+      if (!cell) return type === 'number' ? 0 : '';
+
+      if (type === 'date') {
+        const dateText = row.cells[0]?.querySelector('.date-badge')?.textContent.trim() || '';
+        const timeText = row.cells[1]?.textContent.trim() || '';
+        const dt = new Date(`${dateText} ${timeText}`);
+        return isNaN(dt) ? 0 : dt.getTime();
+      }
+
+      if (type === 'time') {
+        const dateText = row.cells[0]?.querySelector('.date-badge')?.textContent.trim() || '';
+        const timeText = row.cells[1]?.textContent.trim() || '';
+        const dt = new Date(`${dateText} ${timeText}`);
+        return isNaN(dt) ? 0 : dt.getTime();
+      }
+
+      if (type === 'number') {
+        const raw = cell.textContent.trim().replace(/[^\d.\-]/g, '');
+        return parseFloat(raw) || 0;
+      }
+
+      if (colIndex === 5) {
+        return (cell.querySelector('.status-badge')?.textContent.trim() || '').toLowerCase();
+      }
+
+      return cell.textContent.trim().toLowerCase();
+    }
+
+    function sortTableByCol(colIndex, type, dir) {
+      const tbody = document.getElementById('historyTableBody');
+
+      // Always start from the original unmodified order
+      const rows = getOriginalRows().slice();
+
+      rows.sort((a, b) => {
+        const va = getCellValue(a, colIndex, type);
+        const vb = getCellValue(b, colIndex, type);
+        if (va < vb) return dir === 'asc' ? -1 :  1;
+        if (va > vb) return dir === 'asc' ?  1 : -1;
+        return 0;
+      });
+
+      // Move rows into sorted position (appendChild moves existing nodes)
+      rows.forEach(r => tbody.appendChild(r));
+    }
+
+    // Wire up each sort icon button
+    document.querySelectorAll('.col-sort-icon-btn').forEach(iconBtn => {
+      const wrapper  = iconBtn.closest('.col-sort-wrapper');
+      const dropdown = wrapper.querySelector('.col-sort-dropdown');
+
+      // Toggle dropdown on icon button click
+      iconBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = dropdown.classList.contains('open');
+
+        // Close all other open dropdowns first
+        document.querySelectorAll('.col-sort-dropdown.open').forEach(d => d.classList.remove('open'));
+        document.querySelectorAll('.col-sort-icon-btn.active').forEach(b => b.classList.remove('active'));
+
+        if (!isOpen) {
+          dropdown.classList.add('open');
+          iconBtn.classList.add('active');
+        }
+      });
+
+      // Handle option selection
+      dropdown.querySelectorAll('.col-sort-option').forEach(opt => {
+        opt.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const colIndex = parseInt(iconBtn.dataset.col);
+          const type     = iconBtn.dataset.type;
+          const dir      = opt.dataset.dir;
+
+          sortTableByCol(colIndex, type, dir);
+
+          // Mark active option, clear siblings
+          dropdown.querySelectorAll('.col-sort-option').forEach(o => o.classList.remove('active'));
+          opt.classList.add('active');
+
+          // Show sorted state on icon, reset others
+          document.querySelectorAll('.col-sort-icon-btn').forEach(b => b.classList.remove('sorted', 'active'));
+          iconBtn.classList.add('sorted');
+          iconBtn.dataset.sortDir = dir;
+
+          // Close dropdown
+          dropdown.classList.remove('open');
+        });
+      });
+    });
+  </script>
+
+  <!-- ✅ Filter Modal -->
+  <div class="modal-overlay" id="filterModal">
+    <div class="modal-box filter-modal-box">
+      <div class="modal-header">
+        <h3>📅 Filter by Date Range</h3>
+        <button class="modal-close" id="closeFilterModal" title="Close">✕</button>
+      </div>
+
+      <!-- Quick Presets -->
+      <div class="filter-preset-label">Quick Presets</div>
+      <div class="filter-preset-group">
+        <button class="filter-preset-btn" data-preset="today">Today</button>
+        <button class="filter-preset-btn" data-preset="7days">Last 7 Days</button>
+        <button class="filter-preset-btn" data-preset="30days">Last 30 Days</button>
+        <button class="filter-preset-btn" data-preset="custom">Custom Range</button>
+      </div>
+
+      <!-- Custom Date Inputs -->
+      <div class="filter-date-grid" id="filterDateGrid">
+        <div class="form-group" id="fg-filter-from">
+          <label for="filterFromDate">From Date</label>
+          <input type="date" id="filterFromDate" />
+          <span class="field-error">Please select a from date.</span>
+        </div>
+        <div class="form-group" id="fg-filter-to">
+          <label for="filterToDate">To Date</label>
+          <input type="date" id="filterToDate" />
+          <span class="field-error">Please select a to date.</span>
+        </div>
+      </div>
+
+      <!-- Active Filter Banner -->
+      <div class="filter-active-banner" id="filterActiveBanner" style="display:none;">
+        <span class="filter-active-icon">🔍</span>
+        <span id="filterActiveSummary"></span>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" id="resetFilterBtn">Reset</button>
+        <button class="btn-filter-apply" id="applyFilterBtn">
+          <span>📅</span> Apply Filter
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Export Report Modal -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal-box export-modal-box">
+      <div class="modal-header">
+        <h3>📥 Export Report</h3>
+        <button class="modal-close" id="closeExportModal" title="Close">✕</button>
+      </div>
+
+      <!-- Landscape two-column body -->
+      <div class="export-modal-body">
+
+        <!-- LEFT COLUMN: info + security note + format -->
+        <div class="export-col export-col-left">
+
+          <div class="export-preview-info">
+            <div class="export-info-row">
+              <span class="export-info-icon">🏥</span>
+              <div>
+                <div class="export-info-label">Report Type</div>
+                <div class="export-info-value">Threshold History Report</div>
+              </div>
+            </div>
+            <div class="export-info-row">
+              <span class="export-info-icon">📅</span>
+              <div>
+                <div class="export-info-label">Report Date</div>
+                <div class="export-info-value" id="exportDateDisplay"></div>
+              </div>
+            </div>
+            <div class="export-info-row">
+              <span class="export-info-icon">📊</span>
+              <div>
+                <div class="export-info-label">Records Included</div>
+                <div class="export-info-value" id="exportRecordCount"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Security recommendation banner -->
+          <div class="export-security-note">
+            <div class="security-note-text">
+              <strong>Data Security Recommendation</strong>
+              <span>For compliance and audit purposes, it is recommended to retain and export at least <strong>3 months</strong> of sensor logs regularly.</span> 
+            </div>
+          </div>
+
+          <div class="export-format-label">Choose Format</div>
+          <div class="export-format-group">
+            <label class="export-format-card">
+              <input type="radio" name="exportFormat" value="pdf" checked>
+              <div class="export-format-inner">
+                <span class="export-format-icon">📄</span>
+                <span class="export-format-name">PDF</span>
+                <span class="export-format-desc">Printable report</span>
+              </div>
+            </label>
+            <label class="export-format-card">
+              <input type="radio" name="exportFormat" value="csv">
+              <div class="export-format-inner">
+                <span class="export-format-icon">📊</span>
+                <span class="export-format-name">CSV</span>
+                <span class="export-format-desc">Spreadsheet data</span>
+              </div>
+            </label>
+          </div>
+
+        </div><!-- /export-col-left -->
+
+        <!-- RIGHT COLUMN: log range -->
+        <div class="export-col export-col-right">
+
+          <div class="export-format-label">Log Range</div>
+          <div class="export-range-group">
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="current" checked>
+              <div class="export-range-inner">
+                <span class="export-range-name">Current Page</span>
+                <span class="export-range-desc">Visible records</span>
+              </div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="1month">
+              <div class="export-range-inner">
+                <span class="export-range-name">1 Month</span>
+                <span class="export-range-desc">Last 30 days</span>
+              </div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="2months">
+              <div class="export-range-inner">
+                <span class="export-range-name">2 Months</span>
+                <span class="export-range-desc">Last 60 days</span>
+              </div>
+            </label>
+            <label class="export-range-card recommended">
+              <input type="radio" name="exportRange" value="3months">
+              <div class="export-range-inner">
+                <span class="export-range-name">3 Months</span>
+                <span class="export-range-desc">Recommended · 90 days</span>
+              </div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="alltime">
+              <div class="export-range-inner">
+                <span class="export-range-name">All Time</span>
+                <span class="export-range-desc">Complete history</span>
+              </div>
+            </label>
+          </div>
+
+        </div><!-- /export-col-right -->
+
+      </div><!-- /export-modal-body -->
+
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelExportBtn">Cancel</button>
+        <button class="btn-export-confirm" id="confirmExportBtn"> Export Now
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="history.js"></script>
+  <script src="theme.js"></script>
+  <script src="profile_sync.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+<script src="profile_sync.js"></script> 
+</body>
+</html>

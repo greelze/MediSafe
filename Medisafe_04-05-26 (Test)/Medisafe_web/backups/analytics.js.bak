@@ -1,0 +1,901 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://elhshkzfiqmyisxavnsh.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsaHNoa3pmaXFteWlzeGF2bnNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MDg1OTIsImV4cCI6MjA3NDI4NDU5Mn0.0AaxR_opZSkwz2rRwJ21kmuZ7lrOPglLUIgb8nSnr1k";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+const TABLE_NAME = "sensors";
+
+const THRESHOLDS = {
+  temperature: 30,
+  humidity: 60,
+  uv: 1000 // Used for UV index / light exposure
+};
+
+let analyticsData = [];
+let filteredData = [];
+let analyticsChart = null;
+let currentFilter = "all";
+let locationIdToDelete = null;
+
+let locationTableName = null;
+
+async function getLocationTableName() {
+  if (locationTableName) return locationTableName;
+
+  const candidates = ["location", "locations"];
+  for (const candidate of candidates) {
+    const { error } = await supabase.from(candidate).select('id').limit(1);
+    if (!error) {
+      locationTableName = candidate;
+      return candidate;
+    }
+  }
+
+  // Fallback to default if both fail.
+  locationTableName = "location";
+  return locationTableName;
+}
+
+function getRowTimestamp(row) {
+  const candidates = [
+    row.recorded_id,
+    row.recorded_at,
+    row.created_at,
+    row.inserted_at,
+    row.timestamp
+  ];
+
+  for (const value of candidates) {
+    if (!value) continue;
+    const date = new Date(value);
+    if (!isNaN(date)) return date;
+  }
+  return null;
+}
+
+function initializeChart() {
+  if (typeof Chart === 'undefined') {
+    console.error("Chart.js is not loaded!");
+    return;
+  }
+
+  const canvas = document.getElementById("analyticsChart");
+  if (!canvas) {
+    console.error("Canvas element not found!");
+    return;
+  }
+  
+  analyticsChart = new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+         { 
+           label: "Temperature (°C)", 
+           data: [], 
+           borderColor: "#FF0531", 
+           backgroundColor: "rgba(255, 5, 49, 0.1)", 
+           tension: 0.4, 
+           fill: true, 
+           borderWidth: 3,
+           pointBackgroundColor: "#FF0531",
+           pointBorderColor: "#fff",
+           pointBorderWidth: 2,
+           pointRadius: 4,
+           pointHoverRadius: 6
+         },
+         { 
+           label: "Humidity (%)", 
+           data: [], 
+           borderColor: "#3b82f6", 
+           backgroundColor: "rgba(59, 130, 246, 0.1)", 
+           tension: 0.4, 
+           fill: true, 
+           borderWidth: 3,
+           pointBackgroundColor: "#3b82f6",
+           pointBorderColor: "#fff",
+           pointBorderWidth: 2,
+           pointRadius: 4,
+           pointHoverRadius: 6
+         },
+         { 
+           label: "Light Exposure (lx)", 
+           data: [], 
+           borderColor: "#f59e0b", 
+           backgroundColor: "rgba(245, 158, 11, 0.1)", 
+           tension: 0.4, 
+           fill: true, 
+           borderWidth: 3,
+           pointBackgroundColor: "#f59e0b",
+           pointBorderColor: "#fff",
+           pointBorderWidth: 2,
+           pointRadius: 4,
+           pointHoverRadius: 6
+         }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { 
+        legend: { 
+          display: true, 
+          position: "top",
+          labels: {
+            padding: 20,
+            font: {
+              size: 13,
+              weight: 600
+            },
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          titleFont: {
+            size: 14,
+            weight: 600
+          },
+          bodyFont: {
+            size: 13
+          },
+          borderColor: '#e5e7eb',
+          borderWidth: 1
+        }
+      },
+      scales: { 
+        x: { 
+          grid: { 
+            display: false 
+          },
+          ticks: {
+            font: {
+              size: 12
+            }
+          }
+        }, 
+        y: { 
+          grid: { 
+            color: "#f3f4f6" 
+          },
+          ticks: {
+            font: {
+              size: 12
+            }
+          },
+          beginAtZero: true
+        } 
+      }
+    }
+  });
+}
+
+async function loadAnalyticsData() {
+  try {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select("*");
+
+    if (error) throw error;
+    analyticsData = (data || []).slice();
+    console.log("Loaded analyticsData rows:", analyticsData.length);
+
+    // If no data from database, add sample data for testing
+    if (analyticsData.length === 0) {
+      console.warn("No data in database; using sample data for testing.");
+      analyticsData = [
+        {
+          temperature: 25.5,
+          humidity: 65,
+          uv_index: 500,
+          user: "Admin",
+          recorded_at: new Date().toISOString()
+        },
+        {
+          temperature: 28.0,
+          humidity: 70,
+          uv_index: 800,
+          user: "Admin",
+          recorded_at: new Date(Date.now() - 86400000).toISOString() // 1 day ago
+        },
+        {
+          temperature: 22.0,
+          humidity: 55,
+          uv_index: 200,
+          user: "Admin",
+          recorded_at: new Date(Date.now() - 172800000).toISOString() // 2 days ago
+        }
+      ];
+    }
+
+    // Ensure data is sorted by timestamp (newest first) regardless of the column name used.
+    analyticsData.sort((a, b) => {
+      const aDate = getRowTimestamp(a);
+      const bDate = getRowTimestamp(b);
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return bDate - aDate;
+    });
+
+    // If every row has missing timestamp, use insertion order fallback so UI still shows something.
+    if (!analyticsData.some(row => getRowTimestamp(row))) {
+      console.warn("No valid timestamps found in analytics data; applying fallback order.");
+    }
+
+    applyFilters();
+  } catch (err) {
+    console.error("Error loading analytics data:", err);
+    // Keep UI in a safe default state
+    filteredData = [];
+    updateStats();
+    updateCharts();
+    updateTable();
+  }
+}
+
+function applyFilters() {
+  const now = new Date();
+  // Get Monday of current week
+  const startOfWeek = new Date(now);
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  startOfWeek.setDate(diff);
+  startOfWeek.setHours(0, 0, 0, 0);
+
+  // Get Saturday of current week
+  const endOfWeek = new Date(startOfWeek);
+  endOfWeek.setDate(startOfWeek.getDate() + 5);
+  endOfWeek.setHours(23, 59, 59, 999);
+
+  filteredData = analyticsData.filter(row => {
+    const date = getRowTimestamp(row);
+    if (!date) return false;
+    return date >= startOfWeek && date <= endOfWeek;
+  });
+
+  // If the current week has no data or no valid date points, fallback to recent entries (all data) for display.
+  if (!filteredData.length && analyticsData.length) {
+    filteredData = analyticsData.slice(0, 10);
+    console.warn("No current-week analytics found; falling back to latest rows for display.");
+  }
+
+  // If still empty because input rows contain no date, use raw data as fallback.
+  if (!filteredData.length && analyticsData.length) {
+    filteredData = analyticsData.slice();
+    console.warn("Falling back to all available analytics data due to missing timestamps.");
+  }
+
+  updateStats();
+  updateCharts();
+  updateTable();
+}
+
+function updateStats() {
+  const tempAlerts = filteredData.filter(row => row.temperature != null && row.temperature > THRESHOLDS.temperature).length;
+  const humidityAlerts = filteredData.filter(row => row.humidity != null && row.humidity > THRESHOLDS.humidity).length;
+  const uvAlerts = filteredData.filter(row => {
+    const value = row.uv_index ?? row.light;
+    return value != null && value > THRESHOLDS.uv;
+  }).length;
+
+  const totalAlerts = tempAlerts + humidityAlerts + uvAlerts;
+  const totalUsers = new Set(filteredData.map(row => row.user || row.user_id || "Admin")).size;
+
+  const statValues = document.querySelectorAll(".stat-value");
+  if (statValues.length >= 5) {
+    statValues[0].textContent = totalAlerts;
+    statValues[1].textContent = tempAlerts;
+    statValues[2].textContent = humidityAlerts;
+    statValues[3].textContent = uvAlerts;
+    statValues[4].textContent = totalUsers;
+  }
+}
+
+function getSensorType(row) {
+  if (row.temperature != null) return "Temperature";
+  if (row.humidity != null) return "Humidity";
+  if (row.uv_index != null) return "UV Index";
+  if (row.light != null) return "UV Index";
+  return "Unknown";
+}
+
+function getSensorAlertEntries(row) {
+  const entries = [];
+  const user = row.user || row.user_id || "Admin";
+  const dateObj = getRowTimestamp(row);
+  const date = dateObj ? dateObj.toLocaleDateString() : "—";
+
+  if (row.temperature != null) {
+    const value = Number(row.temperature);
+    const isAlert = value > THRESHOLDS.temperature;
+    entries.push({ date, user, sensorType: "Temperature", value: `${value.toFixed(1)}°C`, status: isAlert ? "Alert" : "Normal" });
+  }
+  if (row.humidity != null) {
+    const value = Number(row.humidity);
+    const isAlert = value > THRESHOLDS.humidity;
+    entries.push({ date, user, sensorType: "Humidity", value: `${value.toFixed(1)}%`, status: isAlert ? "Alert" : "Normal" });
+  }
+  const uvValueRaw = row.uv_index != null ? row.uv_index : row.light;
+  if (uvValueRaw != null) {
+    const value = Number(uvValueRaw);
+    const isAlert = value > THRESHOLDS.uv;
+    entries.push({ date, user, sensorType: "UV Index", value: `${value.toFixed(1)}`, status: isAlert ? "Alert" : "Normal" });
+  }
+  return entries;
+}
+
+function updateCharts() {
+  if (!analyticsChart) return;
+
+  if (filteredData.length === 0) {
+    analyticsChart.data.labels = [];
+    analyticsChart.data.datasets.forEach(ds => ds.data = []);
+    analyticsChart.update();
+    console.log("Chart cleared - no data available");
+    return;
+  }
+
+  // Sort ascending by timestamp so the chart reads left-to-right in time order
+  const sorted = [...filteredData].sort((a, b) => {
+    const aTime = getRowTimestamp(a);
+    const bTime = getRowTimestamp(b);
+    if (!aTime && !bTime) return 0;
+    if (!aTime) return 1;
+    if (!bTime) return -1;
+    return aTime - bTime;
+  });
+
+  const labels = sorted.map(row => {
+    const date = getRowTimestamp(row);
+    return date ? date.toLocaleString('en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : "—";
+  });
+
+  analyticsChart.data.labels = labels;
+  analyticsChart.data.datasets[0].data = sorted.map(row => row.temperature != null ? Number(row.temperature) : null);
+  analyticsChart.data.datasets[1].data = sorted.map(row => row.humidity != null ? Number(row.humidity) : null);
+  analyticsChart.data.datasets[2].data = sorted.map(row => row.uv_index != null ? Number(row.uv_index) : (row.light != null ? Number(row.light) : null));
+
+  // Show/hide datasets based on selected filter
+  analyticsChart.data.datasets[0].hidden = currentFilter !== "all" && currentFilter !== "temperature";
+  analyticsChart.data.datasets[1].hidden = currentFilter !== "all" && currentFilter !== "humidity";
+  analyticsChart.data.datasets[2].hidden = currentFilter !== "all" && currentFilter !== "light" && currentFilter !== "uv";
+
+  analyticsChart.update();
+  console.log("Chart updated with", sorted.length, "data points, filter:", currentFilter);
+}
+
+function updateTable() {
+  const tbody = document.querySelector(".reports-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  // Filter data based on current filter
+  let tableData = [];
+  if (currentFilter === "all") {
+    // For "all", include rows that have at least one sensor reading
+    tableData = filteredData.filter(row => 
+      row.temperature != null || row.humidity != null || row.uv_index != null || row.light != null
+    );
+  } else if (currentFilter === "temperature") {
+    tableData = filteredData.filter(row => row.temperature != null);
+  } else if (currentFilter === "humidity") {
+    tableData = filteredData.filter(row => row.humidity != null);
+  } else if (currentFilter === "light" || currentFilter === "uv") {
+    tableData = filteredData.filter(row => row.uv_index != null || row.light != null);
+  }
+
+  // Build per-sensor rows as in prior behavior, with alerts per reading
+  const sensorRows = tableData.flatMap(row => {
+    const entries = getSensorAlertEntries(row);
+    if (currentFilter === "all") return entries;
+    return entries.filter(entry => {
+      if (currentFilter === "temperature") return entry.sensorType === "Temperature";
+      if (currentFilter === "humidity") return entry.sensorType === "Humidity";
+      if (currentFilter === "light" || currentFilter === "uv") return entry.sensorType === "UV Index";
+      return false;
+    });
+  });
+
+  const rows = sensorRows.slice(0, 10);
+  if (!rows.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td colspan="5" style="text-align:center; padding: 24px; color: var(--text-secondary);">
+        No analytics data available for the selected filter.
+      </td>
+    `;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${row.date}</td>
+      <td>${row.user}</td>
+      <td>${row.sensorType}</td>
+      <td><strong>${row.value}</strong></td>
+      <td><span class="${row.status.toLowerCase()}">${row.status}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+}
+
+
+function exportToCSV(exportType = "all") {
+  // Filter data based on current filter
+  let exportData = [];
+  if (currentFilter === "all") {
+    // For "all", include rows that have at least one sensor reading
+    exportData = filteredData.filter(row => 
+      row.temperature != null || row.humidity != null || row.uv_index != null || row.light != null
+    );
+  } else if (currentFilter === "temperature") {
+    exportData = filteredData.filter(row => row.temperature != null);
+  } else if (currentFilter === "humidity") {
+    exportData = filteredData.filter(row => row.humidity != null);
+  } else if (currentFilter === "light" || currentFilter === "uv") {
+    exportData = filteredData.filter(row => row.uv_index != null || row.light != null);
+  }
+
+  const sensorRows = exportData.flatMap(row => getSensorAlertEntries(row));
+  const exportRows = exportType === "alerts"
+    ? sensorRows.filter(entry => entry.status === "Alert")
+    : sensorRows;
+
+  const rows = exportRows.map(e => [
+    e.date,
+    e.user,
+    e.sensorType,
+    e.value,
+    e.status
+  ]);
+
+  const csv = [["Date", "User", "Sensor Type", "Value", "Status"], ...rows]
+    .map(row => row.join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = exportType === "alerts" ? "analytics_alerts_report.csv" : "analytics_report.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+
+function setupFilterButtons() {
+  document.querySelectorAll(".chart-filters .filter-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll(".chart-filters .filter-btn").forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      currentFilter = this.dataset.filter;
+      updateCharts();
+      updateTable();
+      updateStats();
+    });
+  });
+}
+
+function setupExportButton() {
+  const exportBtn = document.getElementById("exportBtn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", showExportModal);
+  }
+}
+
+function showExportModal() {
+  const modal = document.getElementById("exportModal");
+  if (modal) {
+    modal.style.setProperty('display', 'flex', 'important');
+  }
+}
+
+function setupExportModal() {
+  const modal = document.getElementById("exportModal");
+  const exportAlertsBtn = document.getElementById("exportAlertsBtn");
+  const exportAllBtn = document.getElementById("exportAllBtn");
+  const cancelBtn = document.getElementById("cancelExportBtn");
+
+  if (exportAlertsBtn) {
+    exportAlertsBtn.addEventListener("click", () => {
+      hideExportModal();
+      exportToCSV("alerts");
+    });
+  }
+
+  if (exportAllBtn) {
+    exportAllBtn.addEventListener("click", () => {
+      hideExportModal();
+      exportToCSV("all");
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener("click", hideExportModal);
+  }
+
+  // Close modal when clicking outside
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) {
+        hideExportModal();
+      }
+    });
+  }
+}
+
+function hideExportModal() {
+  const modal = document.getElementById("exportModal");
+  if (modal) {
+    modal.style.display = "none";
+  }
+}
+
+function setupPrintButton() {
+  const printBtn = document.getElementById("printBtn");
+  if (!printBtn) return;
+  printBtn.addEventListener("click", printReport);
+}
+
+function formatReportDate(date) {
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+function printReport() {
+  const template = document.getElementById("printTemplate");
+  if (!template) {
+    window.print();
+    return;
+  }
+
+  const dateEl = document.getElementById("printDate");
+  const periodEl = document.getElementById("printPeriod");
+  const locationEl = document.getElementById("printLocation");
+  const generatedEl = document.getElementById("printGeneratedBy");
+  const statsEl = document.getElementById("printStats");
+  const chartEl = document.getElementById("printChart");
+  const tableEl = document.getElementById("printTable");
+
+  const now = new Date();
+  if (dateEl) dateEl.textContent = formatReportDate(now);
+  if (periodEl) periodEl.textContent = "Last 30 Days";
+
+  // Prefer the active location saved in localStorage, but fall back to the selected location in the UI
+  let activeLocationName = localStorage.getItem('activeLocationName');
+  if (!activeLocationName) {
+    const checkedRadio = document.querySelector('input[name="activeLocation"]:checked');
+    if (checkedRadio) {
+      const row = checkedRadio.closest('tr');
+      if (row) {
+        const locationCell = row.querySelector('td:nth-child(2)');
+        activeLocationName = locationCell ? locationCell.textContent.trim() : '';
+      }
+    }
+  }
+  if (locationEl) locationEl.textContent = activeLocationName || 'N/A';
+  if (generatedEl) generatedEl.textContent = "MediSafe System";
+
+  if (statsEl) {
+    const totalAlerts = document.querySelectorAll(".stat-card.primary .stat-value")[0]?.textContent || "0";
+    const tempAlerts = document.querySelectorAll(".stat-card.temperature .stat-value")[0]?.textContent || "0";
+    const humidityAlerts = document.querySelectorAll(".stat-card.humidity .stat-value")[0]?.textContent || "0";
+    const lightAlerts = document.querySelectorAll(".stat-card.light .stat-value")[0]?.textContent || "0";
+
+    statsEl.innerHTML = `
+      <div class="print-stat">
+        <div class="print-stat-title">Total Alerts</div>
+        <div class="print-stat-value">${totalAlerts}</div>
+      </div>
+      <div class="print-stat">
+        <div class="print-stat-title">Temperature Alerts</div>
+        <div class="print-stat-value">${tempAlerts}</div>
+      </div>
+      <div class="print-stat">
+        <div class="print-stat-title">Humidity Alerts</div>
+        <div class="print-stat-value">${humidityAlerts}</div>
+      </div>
+      <div class="print-stat">
+        <div class="print-stat-title">UV Alerts</div>
+        <div class="print-stat-value">${lightAlerts}</div>
+      </div>
+    `;
+  }
+
+  if (chartEl && analyticsChart) {
+    const img = document.createElement("img");
+    img.src = analyticsChart.toBase64Image();
+    chartEl.innerHTML = "";
+    chartEl.appendChild(img);
+  }
+
+  if (tableEl) {
+    const headers = ["Date", "User", "Sensor Type", "Value", "Status"];
+    const rows = filteredData.flatMap(row => getSensorAlertEntries(row));
+
+    let tableHTML = `<div class="print-table"><table><thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead><tbody>`;
+    tableHTML += rows.slice(0, 10).map(r => `<tr><td>${r.date}</td><td>${r.user}</td><td>${r.sensorType}</td><td>${r.value}</td><td>${r.status}</td></tr>`).join("");
+    tableHTML += "</tbody></table></div>";
+    tableEl.innerHTML = tableHTML;
+  }
+
+  template.classList.add("show");
+  window.print();
+  template.classList.remove("show");
+}
+
+// Initialize when DOM is ready
+document.addEventListener("DOMContentLoaded", function() {
+  initializeChart();
+  setupFilterButtons();
+  setupExportButton();
+  setupExportModal();
+  setupPrintButton();
+  loadAnalyticsData();
+  loadDashboardData();
+  subscribeToSensorUpdates();
+  setupLocationModal();
+});
+
+async function loadDashboardData() {
+  // 1. Fetch locations (table name may vary: location vs locations)
+  const tableName = await getLocationTableName();
+  const { data: locations, error: locError } = await supabase
+    .from(tableName)
+    .select('*');
+
+  if (locError) {
+    console.error('Error loading locations:', locError.message || locError);
+    return;
+  }
+
+  const safeLocations = Array.isArray(locations) ? locations : [];
+
+  const tableBody = document.getElementById('data-table');
+  if (!tableBody) return;
+  tableBody.innerHTML = "";
+
+  const activeLocId = localStorage.getItem('activeLocationId');
+
+  for(const loc of safeLocations){
+    const { data: locReadings } = await supabase
+      .from('sensors')
+      .select('temperature, humidity, uv_index, recorded_id')
+      .eq('location_id', loc.id)
+      .limit(10); // Fetch some recent records, then pick the newest client-side
+
+    const reading = (locReadings && locReadings.length > 0)
+      ? locReadings
+          .slice()
+          .sort((a, b) => {
+            const aTime = getRowTimestamp(a);
+            const bTime = getRowTimestamp(b);
+            if (!aTime && !bTime) return 0;
+            if (!aTime) return 1;
+            if (!bTime) return -1;
+            return bTime - aTime;
+          })[0]
+      : { temperature: '--', humidity: '--', uv_index: '--' };
+
+    const isChecked = activeLocId === String(loc.id) ? 'checked' : '';
+    const rowClass = activeLocId === String(loc.id) ? 'active-location-row' : '';
+
+    const createdAt = loc.created_at ? new Date(loc.created_at).toLocaleDateString() : "—";
+    const tempDisplay = reading.temperature != null ? `${reading.temperature}°C` : "—";
+    const humidityDisplay = reading.humidity != null ? `${reading.humidity}%` : "—";
+    const uvDisplay = reading.uv_index != null ? `${Number(reading.uv_index).toFixed(2)} UV` : "—";
+
+    const tr = document.createElement('tr');
+    tr.className = rowClass;
+    tr.setAttribute('data-id', loc.id);
+    tr.innerHTML = `
+      <td>
+        <input type="radio" name="activeLocation" onclick="setActiveLocation(${loc.id}, ${JSON.stringify(loc.locations)})" ${isChecked}>
+      </td>
+      <td><strong>${loc.locations}</strong></td>
+      <td>${createdAt}</td>
+      <td>${tempDisplay}</td>
+      <td>${humidityDisplay}</td>
+      <td>${uvDisplay}</td>
+      <td>
+        <button class="action-btn delete-btn" onclick="deleteLocation(${loc.id}, ${JSON.stringify(loc.locations)})">
+          DELETE
+        </button>
+      </td>
+    `;
+    tableBody.appendChild(tr);
+  }
+
+  // Ensure a location is always set for printing/reporting (fallback to first in list)
+  const checkedRadio = tableBody.querySelector('input[name="activeLocation"]:checked');
+  if (!checkedRadio && safeLocations.length > 0) {
+    const firstLoc = safeLocations[0];
+    localStorage.setItem('activeLocationId', String(firstLoc.id));
+    localStorage.setItem('activeLocationName', firstLoc.locations);
+
+    const firstRadio = tableBody.querySelector('input[name="activeLocation"]');
+    if (firstRadio) {
+      firstRadio.checked = true;
+      const firstRow = firstRadio.closest('tr');
+      if (firstRow) firstRow.classList.add('active-location-row');
+    }
+  }
+
+}
+
+
+window.setActiveLocation = async function(id, name) {
+    // 1. Update the Database Bridge
+    const { error } = await supabase
+        .from('current_config')
+        .update({ active_location_id: id })
+        .eq('id', 1); // We always update the first row
+
+    if (error) {
+        console.error("Error syncing to DB:", error.message);
+        alert("Failed to sync location to database.");
+        return;
+    }
+
+    // 2. Keep the local UI updated
+    localStorage.setItem('activeLocationId', id);
+    localStorage.setItem('activeLocationName', name);
+    
+    alert(`System gathering data for: ${name}`);
+    loadDashboardData();
+};
+
+// Modal helpers (initialized when DOM is ready)
+function setupLocationModal() {
+  const modal = document.getElementById('locationModal');
+  const addLocBtn = document.getElementById('addLocBtn');
+  const closeBtn = document.getElementById('closeModal');
+  const cancelBtn = document.getElementById('cancelBtn');
+  const locationForm = document.getElementById('locationForm');
+
+  if (!modal || !addLocBtn || !closeBtn || !cancelBtn || !locationForm) {
+    console.warn('Location modal elements missing; add-location UI will not work.');
+    return;
+  }
+
+  const hideModal = () => {
+    modal.style.display = 'none';
+    locationForm.reset();
+  };
+
+  addLocBtn.addEventListener('click', () => {
+    modal.style.display = 'flex';
+  });
+
+  closeBtn.addEventListener('click', hideModal);
+  cancelBtn.addEventListener('click', hideModal);
+
+  locationForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const locations = document.getElementById('locName').value;
+    const isActive = document.getElementById('locStatus').checked;
+
+    const tableName = await getLocationTableName();
+    const { data, error } = await supabase
+      .from(tableName)
+      .insert([
+        {
+          locations: locations,
+          is_active: isActive
+        }
+      ]);
+
+    if (error) {
+      console.error('Error saving location:', error.message);
+      return;
+    }
+
+    hideModal();
+
+    const sModal = document.getElementById('successModal');
+    if (sModal) {
+      sModal.style.display = 'flex';
+    }
+
+    loadDashboardData();
+  });
+
+  const closeSuccessBtn = document.getElementById('closeSuccessBtn');
+  if (closeSuccessBtn) {
+    closeSuccessBtn.onclick = () => {
+      document.getElementById('successModal').style.display = 'none';
+    };
+  }
+}
+
+
+const subscribeToSensorUpdates = () => {
+  supabase
+    .channel('sensor-changes')
+    .on(
+      'postgres_changes', 
+      { event: 'INSERT', schema: 'public', table: 'sensors' }, 
+      (payload) => {
+        console.log('New data received!', payload.new);
+        
+        // Refresh the dashboard table (the row with the active ID)
+        loadDashboardData();
+        
+        // Refresh the analytics charts and stats
+        loadAnalyticsData();
+      }
+    )
+    .subscribe();
+};
+
+
+// FORCE the function into the global scope so HTML onclick can find it
+window.deleteLocation = function(id, name) {
+    // Save for the confirm button handler
+    locationIdToDelete = id;
+
+    const dModal = document.getElementById('deleteModal');
+    const dName = document.getElementById('deleteLocName');
+
+    if (dModal && dName) {
+        dName.textContent = name;
+        dModal.style.setProperty('display', 'flex', 'important');
+    }
+};
+
+// Set up the button listeners once the page is ready
+document.addEventListener("DOMContentLoaded", () => {
+    const confirmBtn = document.getElementById('confirmDelete');
+    const cancelBtn = document.getElementById('cancelDelete');
+
+    if (confirmBtn) {
+        confirmBtn.onclick = async () => {
+          
+            if (!locationIdToDelete) return;
+
+            const tableName = await getLocationTableName();
+            const { error } = await supabase
+                .from(tableName)
+                .delete()
+                .eq('id', locationIdToDelete);
+
+            if (error) {
+                console.error('Supabase Delete Error:', error.message);
+                alert("Failed to delete from database: " + error.message);
+            } else {
+                document.getElementById('deleteModal').style.display = 'none';
+                locationIdToDelete = null;
+                // Refresh the list
+                if (typeof loadDashboardData === "function") {
+                    loadDashboardData();
+                }
+            }
+        };
+    }
+
+    if (cancelBtn) {
+        cancelBtn.onclick = () => {
+            document.getElementById('deleteModal').style.display = 'none';
+            locationIdToDelete = null;
+        };
+    }
+
+    const closeSuccessBtn = document.getElementById('closeSuccessBtn');
+    if (closeSuccessBtn) {
+        closeSuccessBtn.onclick = () => {
+            document.getElementById('successModal').style.display = 'none';
+        };
+    }
+
+    
+});

@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Analytics — MediSafe</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="dashboard_page.css">
+  <link rel="stylesheet" href="analytics_page.css">
+  <link rel="stylesheet" href="theme.css">
+
+  <style>
+    /* Reports Table header layout */
+    .table-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .table-header-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .export-table-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+      white-space: nowrap;
+    }
+    .export-table-btn:hover { background: #1d4ed8; }
+  </style>
+
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo-section">
+        <div class="logo">🏥</div>
+        <div class="brand-name">MediSafe</div>
+      </div>
+
+      <div class="nav-section">
+        <a href="dashboard_page.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="history_page.html" class="nav-item">
+          <span class="nav-icon">🕒</span>
+          <span class="nav-text">Threshold History</span>
+        </a>
+        <a href="analytics_page.html" class="nav-item active">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Analytics</span>
+        </a>
+        <a href="audit_trail_local.html" class="nav-item">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">Audit Trail</span>
+        </a>
+        <a href="monitoring_log.html" class="nav-item">
+                    <span class="nav-icon">🩺</span>
+                    <span class="nav-text">Monitoring Log</span>
+                </a>
+        <a href="settings_page.html" class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </a>
+      </div>
+      
+      <div class="profile-section">
+        <a href="profile_page.html" class="profile-link">
+          <div class="avatar-placeholder"></div>
+        </a>
+        <a href="login_page.html" class="nav-item logout-item">
+          <span class="nav-icon">🚪</span>
+          <span class="nav-text">Logout</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="header">
+        <span id="page-title">Analytics</span>
+        <div class="header-actions">
+          <button class="print-btn" id="printBtn">
+            <span>🖨️</span>
+            <span>Print Report</span>
+          </button>
+          <button class="export-btn" id="exportBtn">
+            <span>📥</span>
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="content-body">
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+          <div class="stat-card primary">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Total Alerts This Week</div>
+            </div>
+          </div>
+          <div class="stat-card temperature">
+            <div class="stat-icon">🌡️</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Temperature Alerts</div>
+            </div>
+          </div>
+          <div class="stat-card humidity">
+            <div class="stat-icon">💧</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Humidity Alerts</div>
+            </div>
+          </div>
+          <div class="stat-card light">
+            <div class="stat-icon">💡</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">UV Intensity Alerts</div>
+            </div>
+          </div>
+          <div class="stat-card users">
+            <div class="stat-icon">👥</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Total Users</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart Card -->
+        <div class="chart-section">
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <h2>Weekly Sensor Trends</h2>
+              <div class="chart-filters">
+                <button class="filter-btn active" data-filter="all">All Data</button>
+                <button class="filter-btn" data-filter="temperature">Temperature</button>
+                <button class="filter-btn" data-filter="humidity">Humidity</button>
+                <button class="filter-btn" data-filter="light">UV</button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="analyticsChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="sensor_module">
+          <div class="sensor-card">
+            <div class="sensor-card-header">
+              <h2>Sensor Location</h2>
+              <div class="loc-buttons">
+                <button class="filter-btn active" id="addLocBtn">Add Location</button>
+              </div>
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Active</th>
+                    <th>Location</th> 
+                    <th>Created At</th>
+                    <th>Temperature</th>
+                    <th>Humidity</th>
+                    <th>UV Index</th>
+                    <th>Delete</th>
+                  </tr>
+                </thead>
+                <tbody id="data-table">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reports Table -->
+        <div class="table-card">
+          <div class="table-card-header">
+            <h2>Analytics Reports</h2>
+            <div class="table-header-right">
+              <div class="table-info">Showing latest 10 entries</div>
+              <button class="export-table-btn" id="exportTableBtn">
+                <span>📥</span>
+                <span>Export Report</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Temperature</th>
+                  <th>Temp Status</th>
+                  <th>Humidity</th>
+                  <th>Hum Status</th>
+                  <th>UV</th>
+                  <th>UV Status</th>
+                </tr>
+              </thead>
+              <tbody class="reports-tbody">
+                <!-- Data will be populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="locationModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add New Sensor Location</h2>
+        <button class="close-btn" id="closeModal">&times;</button>
+      </div>
+      <form id="locationForm">
+        <div class="form-group">
+          <label for="locName">Location Name</label>
+          <input type="text" id="locName" placeholder="e.g. Pharmacy Fridge" required>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="locStatus" checked> Mark as Active
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn-primary">Save Location</button>
+        </div>
+      </form>
+    </div>
+  </div> <div id="deleteModal" class="custom-modal" style="display: none;">
+    <div class="modal-content">
+      <h3 style="color: black; margin-bottom: 10px;">Confirm Deletion</h3>
+      <p style="color: #4b5563;">Are you sure you want to delete <br><strong id="deleteLocName" style="color: #111827;"></strong>?</p>
+      <div style="margin-top: 25px; display: flex; justify-content: center; gap: 15px;">
+        <button id="cancelDelete" class="btn-secondary">Cancel</button>
+        <button id="confirmDelete" class="btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="successModal" class="custom-modal" style="display: none;">
+    <div class="modal-content" style="border-top: 5px solid #3ecf8e;">
+      <div style="font-size: 50px; color: #3ecf8e; margin-bottom: 10px;">✅</div>
+      <h3 style="color: black;">Success!</h3>
+      <p style="color: #4b5563;">Location saved successfully!</p>
+      <div style="margin-top: 20px;">
+        <button id="closeSuccessBtn" class="btn-primary" style="width: 100%;">Great!</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="gatheringModal" class="custom-modal" style="display: none;">
+    <div class="modal-content">
+      <div style="font-size: 50px; color: #3b82f6; margin-bottom: 10px;">📊</div>
+      <h3 style="color: black;">Switching Location</h3>
+      <p style="color: #4b5563;">Gathering data for <strong id="gatheringLocName"></strong>...</p>
+      <div style="margin-top: 20px;">
+        <button id="closeGatheringBtn" class="btn-secondary" style="width: 100%;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="printTemplate" style="display: none;">
+    <div class="print-container">
+      <header class="print-header">
+        <div class="print-brand">
+          <div class="print-logo">🏥</div>
+          <div>
+            <h1 class="print-title">MediSafe Analytics Report</h1>
+            <div class="print-subtitle" id="printHospitalName">Your Hospital Name</div> 
+          </div>
+        </div>
+
+        <div class="print-meta">
+          <div><span class="meta-label">Report Date:</span> <span id="printDate"></span></div>
+          <div><span class="meta-label">Period:</span> <span id="printPeriod"></span></div>
+          <div><span class="meta-label">Location:</span> <span id="printLocation"></span></div>
+          <div><span class="meta-label">Generated By:</span> <span id="printGeneratedBy"></span></div>
+        </div>
+      </header>
+
+      <section class="print-section">
+        <h2 class="print-section-title">Summary Statistics</h2>
+        <div class="print-stats" id="printStats"></div>
+      </section>
+
+      <section class="print-section">
+        <h2 class="print-section-title">Chart</h2>
+        <div id="printChart" class="print-chart"></div>
+      </section>
+
+      <section class="print-section">
+        <h2 class="print-section-title">Detailed Analytics Report</h2>
+        <div id="printTable"></div>
+      </section>
+    </div>
+  </div>
+
+  <div id="exportModal" class="custom-modal" style="display: none;">
+    <div class="modal-content">
+      <h3 style="color: black; margin-bottom: 20px;">Export Options</h3>
+      <p style="color: #4b5563; margin-bottom: 25px;">Choose what data to export:</p>
+      <div style="display: flex; flex-direction: column; gap: 15px;">
+        <button id="exportAlertsBtn" class="btn-primary" style="width: 100%;">📊 Triggered Alerts</button>
+        <button id="exportAllBtn" class="btn-secondary" style="width: 100%;">📋 All Data</button>
+      </div>
+      <div style="margin-top: 20px; text-align: center;">
+        <button id="cancelExportBtn" class="btn-secondary">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reports Table Export Modal (2-step: range → format) -->
+  <div id="reportExportModal" class="custom-modal" style="display: none;">
+    <div class="modal-content" style="max-width: 380px; width: 90%;">
+
+      <!-- Step 1: Date Range -->
+      <div id="reportExportStep1">
+        <h3 style="color: black; margin-bottom: 6px;">Export Analytics Report</h3>
+        <p style="color: #6b7280; font-size: 13px; margin-bottom: 18px;">Select the date range to export:</p>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button class="range-btn" data-days="7">
+            <span class="range-label">Last 7 Days</span>
+            <span class="range-arrow">›</span>
+          </button>
+          <button class="range-btn" data-days="30">
+            <span class="range-label">Last 1 Month</span>
+            <span class="range-arrow">›</span>
+          </button>
+          <button class="range-btn" data-days="60">
+            <span class="range-label">Last 2 Months</span>
+            <span class="range-arrow">›</span>
+          </button>
+          <button class="range-btn" data-days="90">
+            <span class="range-label">Last 3 Months</span>
+            <span class="range-arrow">›</span>
+          </button>
+          <button class="range-btn range-btn-all" data-days="0">
+            <span class="range-label">All Time</span>
+            <span class="range-arrow">›</span>
+          </button>
+        </div>
+        <div style="margin-top: 18px; text-align: center;">
+          <button id="cancelReportExportBtn" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Step 2: Format -->
+      <div id="reportExportStep2" style="display: none;">
+        <button id="reportExportBackBtn" style="background:none;border:none;color:#2563eb;font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px;">‹ Back</button>
+        <h3 style="color: black; margin-bottom: 4px;">Choose Format</h3>
+        <p id="reportExportRangeLabel" style="color: #6b7280; font-size: 13px; margin-bottom: 18px;"></p>
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button id="reportExportCsvBtn" class="btn-primary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <span>📄</span> Export as CSV
+          </button>
+          <button id="reportExportPdfBtn" class="btn-secondary" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <span>🖨️</span> Export as PDF
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <style>
+    .range-btn {
+      display: flex; align-items: center; gap: 10px;
+      width: 100%; padding: 11px 14px;
+      background: #f8fafc; border: 1.5px solid #e5e7eb; border-radius: 10px;
+      font-size: 14px; font-weight: 500; color: #111; cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      text-align: left;
+    }
+    .range-btn:hover { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
+    .range-btn-all   { border-style: dashed; }
+    .range-icon      { font-size: 16px; }
+    .range-label     { flex: 1; }
+    .range-arrow     { color: #9ca3af; font-size: 18px; font-weight: 400; }
+    .range-btn:hover .range-arrow { color: #2563eb; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="profile_sync.js"></script> 
+  <script type="module" src="analytics.js"></script>
+  <script src="theme.js"></script>
+</body>
+</html>

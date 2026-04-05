@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Analytics — MediSafe</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="dashboard_page.css">
+  <link rel="stylesheet" href="analytics_page.css">
+  <link rel="stylesheet" href="theme.css">
+
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo-section">
+        <div class="logo">🏥</div>
+        <div class="brand-name">MediSafe</div>
+      </div>
+
+      <div class="nav-section">
+        <a href="dashboard_page.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="history_page.html" class="nav-item">
+          <span class="nav-icon">🕒</span>
+          <span class="nav-text">Threshold History</span>
+        </a>
+        <a href="analytics_page.html" class="nav-item active">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Analytics</span>
+        </a>
+        <a href="audit_trail_local.html" class="nav-item">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">Audit Trail</span>
+        </a>
+        <a href="settings_page.html" class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </a>
+      </div>
+      
+      <div class="profile-section">
+        <a href="profile_page.html" class="profile-link">
+          <div class="avatar-placeholder"></div>
+        </a>
+        <a href="login_page.html" class="nav-item logout-item">
+          <span class="nav-icon">🚪</span>
+          <span class="nav-text">Logout</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="header">
+        <span id="page-title">Analytics</span>
+        <div class="header-actions">
+          <button class="print-btn" onclick="window.print()">
+            <span>🖨️</span>
+            <span>Print Report</span>
+          </button>
+          <button class="export-btn" id="exportBtn">
+            <span>📥</span>
+            <span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="content-body">
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+          <div class="stat-card primary">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Total Alerts This Week</div>
+            </div>
+          </div>
+          <div class="stat-card temperature">
+            <div class="stat-icon">🌡️</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Temperature Alerts</div>
+            </div>
+          </div>
+          <div class="stat-card humidity">
+            <div class="stat-icon">💧</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Humidity Alerts</div>
+            </div>
+          </div>
+          <div class="stat-card light">
+            <div class="stat-icon">💡</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">UV Intensity Alerts</div>
+            </div>
+          </div>
+          <div class="stat-card users">
+            <div class="stat-icon">👥</div>
+            <div class="stat-content">
+              <div class="stat-value">0</div>
+              <div class="stat-label">Total Users</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart Card -->
+        <div class="chart-section">
+          <div class="chart-card">
+            <div class="chart-card-header">
+              <h2>Weekly Sensor Trends</h2>
+              <div class="chart-filters">
+                <button class="filter-btn active" data-filter="all">All Data</button>
+                <button class="filter-btn" data-filter="temperature">Temperature</button>
+                <button class="filter-btn" data-filter="humidity">Humidity</button>
+                <button class="filter-btn" data-filter="light">UV</button>
+              </div>
+            </div>
+            <div class="chart-container">
+              <canvas id="analyticsChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="sensor_module">
+          <div class="sensor-card">
+            <div class="sensor-card-header">
+              <h2>Sensor Location</h2>
+              <div class="loc-buttons">
+                <button class="filter-btn active" id="addLocBtn">Add Location</button>
+              </div>
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Active</th>
+                    <th>Location</th> 
+                    <th>Created At</th>
+                    <th>Temperature</th>
+                    <th>Humidty</th>
+                    <th>UV Index</th>
+                    <th>Delete</th>
+                  </tr>
+                </thead>
+                <tbody id="data-table">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reports Table -->
+        <div class="table-card">
+          <div class="table-card-header">
+            <h2>Analytics Reports</h2>
+            <div class="table-info">Showing latest 10 entries</div>
+          </div>
+
+          <div class="table-container">
+            <table class="modern-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>User</th>
+                  <th>Sensor Type</th>
+                  <th>Value</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody class="reports-tbody">
+                <!-- Data will be populated by JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="locationModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add New Sensor Location</h2>
+        <button class="close-btn" id="closeModal">&times;</button>
+      </div>
+      <form id="locationForm">
+        <div class="form-group">
+          <label for="locName">Location Name</label>
+          <input type="text" id="locName" placeholder="e.g. Pharmacy Fridge" required>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn-primary">Save Location</button>
+        </div>
+      </form>
+    </div>
+  </div> <div id="deleteModal" class="custom-modal">
+    <div class="modal-content">
+      <h3 style="color: black; margin-bottom: 10px;">Confirm Deletion</h3>
+      <p style="color: #4b5563;">Are you sure you want to delete <br><strong id="deleteLocName" style="color: #111827;"></strong>?</p>
+      <div style="margin-top: 25px; display: flex; justify-content: center; gap: 15px;">
+        <button id="cancelDelete" class="btn-secondary">Cancel</button>
+        <button id="confirmDelete" class="btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="successModal" class="custom-modal" style="display: none;">
+    <div class="modal-content" style="border-top: 5px solid #3ecf8e;">
+      <div style="font-size: 50px; color: #3ecf8e; margin-bottom: 10px;">✅</div>
+      <h3 style="color: black;">Success!</h3>
+      <p style="color: #4b5563;">Location saved successfully!</p>
+      <div style="margin-top: 20px;">
+        <button id="closeSuccessBtn" class="btn-primary" style="width: 100%;">Great!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gathering Data Modal -->
+<div id="gatheringModal" class="custom-modal" style="display: none;">
+  <div class="modal-content" style="border-top: 5px solid #3b82f6; text-align: center;">
+    <div style="font-size: 50px; margin-bottom: 10px;">📡</div>
+    <h3 style="color: black;">System Active</h3>
+    <p style="color: #4b5563;">Now gathering data for:<br><strong id="gatheringLocName" style="color: #111827; font-size: 1.1rem;"></strong></p>
+    <div style="margin-top: 20px;">
+      <button id="closeGatheringBtn" class="btn-primary" style="width: 100%;">Got it!</button>
+    </div>
+  </div>
+</div>
+
+  <script type="module" src="analytics.js"></script>
+  <script src="theme.js"></script>
+</body>
+</html>

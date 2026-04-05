@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediSafe Dashboard</title>
+
+    <!-- Page-specific CSS -->
+    <link rel="stylesheet" href="dashboard_page.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <link rel="stylesheet" href="theme.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <div class="sidebar">
+            <div class="logo-section">
+                <div class="logo">🏥</div>
+                <div class="brand-name">MediSafe</div>
+            </div>
+
+            <div class="nav-section">
+                <a href="dashboard_page.html" class="nav-item active">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-text">Home</span>
+                </a>
+                <a href="history_page.html" class="nav-item">
+                    <span class="nav-icon">🕒</span>
+                    <span class="nav-text">Threshold History</span>
+                </a>
+                <a href="analytics_page.html" class="nav-item">
+                    <span class="nav-icon">📊</span>
+                    <span class="nav-text">Analytics</span>
+                </a>
+                <a href="audit_trail_local.html" class="nav-item">
+                    <span class="nav-icon">📋</span>
+                    <span class="nav-text">Audit Trail</span>
+                </a>
+                <a href="monitoring_log.html" class="nav-item">
+                    <span class="nav-icon">🩺</span>
+                    <span class="nav-text">Monitoring Log</span>
+                </a>
+                <a href="settings_page.html" class="nav-item">
+                    <span class="nav-icon">⚙️</span>
+                    <span class="nav-text">Settings</span>
+                </a>
+            </div>
+            
+            <div class="profile-section">
+                <a href="profile_page.html" class="profile-link">
+                    <div class="avatar-placeholder"></div>
+                </a>
+                <a href="login_page.html" class="nav-item logout-item" id="logout-btn">
+                    <span class="nav-icon">🚪</span>
+                    <span class="nav-text">Logout</span>
+                </a>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="header">
+                <span id="page-title">Dashboard</span>
+            </div>
+            <div class="content-body">
+                <div class="metrics-row">
+                    <div class="metric-card temperature">
+                        <div class="metric-header">
+                            <span class="metric-icon">🌡️</span>
+                            <span class="metric-label">Current Temperature</span>
+                        </div>
+                        <div class="metric-value">23.1°C</div>
+                    </div>
+                    <div class="metric-card humidity">
+                        <div class="metric-header">
+                            <span class="metric-icon">💧</span>
+                            <span class="metric-label">Current Humidity</span>
+                        </div>
+                        <div class="metric-value">50.4%</div>
+                    </div>
+                    <div class="metric-card uv">
+                        <div class="metric-header">
+                            <span class="metric-icon">🔅</span>
+                            <span class="metric-label">Current UV Index</span>
+                        </div>
+                        <div class="metric-value">9</div>
+                    </div>
+                </div>
+
+                <h2 class="section-title" style="font-size: 20px; font-weight: 700; margin: 24px 0 16px 0;">Prediction Analysis</h2>
+                <div class="metrics-row ai-forecast-row">
+                    <div class="metric-card ai-card">
+                        <div class="metric-header">
+                            <span class="metric-icon ai-icon">🌡️</span>
+                            <span class="metric-label">Predicted Temp</span>
+                        </div>
+                        <div class="metric-value" id="ai-temp">--°C</div>
+                        <div class="trend-label" id="ai-temp-trend">--</div>
+                    </div>
+                    <div class="metric-card ai-card">
+                        <div class="metric-header">
+                            <span class="metric-icon ai-icon">💧</span>
+                            <span class="metric-label">Predicted Humidity</span>
+                        </div>
+                        <div class="metric-value" id="ai-hum">--%</div>
+                        <div class="trend-label" id="ai-hum-trend">--</div>
+                    </div>
+                    <div class="metric-card ai-card">
+                        <div class="metric-header">
+                            <span class="metric-icon ai-icon">🔅</span>
+                            <span class="metric-label">Predicted UV</span>
+                        </div>
+                        <div class="metric-value" id="ai-uv">--</div>
+                        <div class="trend-label" id="ai-uv-trend">--</div>
+                    </div>
+                </div>
+
+                <div class="chart-container-wrapper">
+                    <div class="chart-card">
+                        <div class="chart-header">Temperature Trend</div>
+                        <div class="chart-area">
+                            <canvas id="tempChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-header">Humidity Trend</div>
+                        <div class="chart-area">
+                            <canvas id="humidityChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-header">UV Index Trend</div>
+                        <div class="chart-area">
+                            <canvas id="uvChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Get theme-aware colors
+        function getThemeColors() {
+            const isDark = document.body.classList.contains('dark-mode');
+            return {
+                gridColor: isDark ? '#404040' : '#f3f4f6',
+                textColor: isDark ? '#d1d5db' : '#6b7280'
+            };
+        }
+
+        // Initialize charts
+        let tempChart, humidityChart;
+
+        function createCharts() {
+            const colors = getThemeColors();
+
+            // Temperature Chart
+            const tempCtx = document.getElementById('tempChart').getContext('2d');
+            tempChart = new Chart(tempCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '10m', '11m', '12m'],
+                    datasets: [{
+                        label: 'Temperature (°C)',
+                        data: [20, 21, 19, 22, 24, 23, 25, 24, 22, 21, 23, 22],
+                        borderColor: '#F77F00',
+                        backgroundColor: 'rgba(255, 5, 49, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#F77F00',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: colors.gridColor },
+                            ticks: { color: colors.textColor }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: colors.textColor }
+                        }
+                    }
+                }
+            });
+
+            // Humidity Chart
+            const humidityCtx = document.getElementById('humidityChart').getContext('2d');
+            humidityChart = new Chart(humidityCtx, {
+                type: 'line',
+                data: {
+                    labels: ['1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '10m', '11m', '12m'],
+                    datasets: [{
+                        label: 'Humidity (%)',
+                        data: [20, 21, 22, 24, 23, 25, 24, 22, 21, 23, 22, 20],
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 3,
+                        tension: 0.4,
+                        fill: true,
+                        pointBackgroundColor: '#3b82f6',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: colors.gridColor },
+                            ticks: { color: colors.textColor }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: colors.textColor }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update chart colors when theme changes
+        function updateChartColors() {
+            const colors = getThemeColors();
+            
+            if (tempChart) {
+                tempChart.options.scales.y.grid.color = colors.gridColor;
+                tempChart.options.scales.y.ticks.color = colors.textColor;
+                tempChart.options.scales.x.ticks.color = colors.textColor;
+                tempChart.update();
+            }
+            
+            if (humidityChart) {
+                humidityChart.options.scales.y.grid.color = colors.gridColor;
+                humidityChart.options.scales.y.ticks.color = colors.textColor;
+                humidityChart.options.scales.x.ticks.color = colors.textColor;
+                humidityChart.update();
+            }
+        }
+
+        // Listen for theme changes
+        window.addEventListener('themeChanged', function() {
+            updateChartColors();
+        });
+
+        // Initialize charts when page loads
+        window.addEventListener('load', function() {
+            createCharts();
+        });
+
+        // Logout functionality - automatic logout and redirect to login_page.html
+        document.getElementById('logout-btn').addEventListener('click', async function(e) {
+            e.preventDefault();
+            
+            if (confirm('Are you sure you want to logout?')) {
+                try {
+                    // Sign out from Supabase (if using auth)
+                    const { error } = await supabase.auth.signOut();
+                    if (error) console.error('Logout error:', error);
+                } catch (err) {
+                    console.error('Logout failed:', err);
+                }
+                
+                console.log('Logging out...');
+                window.location.href = 'login_page.html';
+            }
+        });
+    </script>
+
+        <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+        <script src="profile_sync.js"></script> 
+        <script type="module" src="dashboard_page.js"></script>  <!-- para ma-connect yung Supabase sa dashboard, wag kalimutan ilagay yung "type="module"" sa script, aight? -->
+    <script src="theme.js"></script>
+</body>
+</html>
