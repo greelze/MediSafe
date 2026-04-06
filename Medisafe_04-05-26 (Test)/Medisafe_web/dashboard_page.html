@@ -141,148 +141,18 @@
     </div>
 
     <script>
-        // Get theme-aware colors
-        function getThemeColors() {
-            const isDark = document.body.classList.contains('dark-mode');
-            return {
-                gridColor: isDark ? '#404040' : '#f3f4f6',
-                textColor: isDark ? '#d1d5db' : '#6b7280'
-            };
-        }
-
-        // Initialize charts
-        let tempChart, humidityChart;
-
-        function createCharts() {
-            const colors = getThemeColors();
-
-            // Temperature Chart
-            const tempCtx = document.getElementById('tempChart').getContext('2d');
-            tempChart = new Chart(tempCtx, {
-                type: 'line',
-                data: {
-                    labels: ['1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '10m', '11m', '12m'],
-                    datasets: [{
-                        label: 'Temperature (°C)',
-                        data: [20, 21, 19, 22, 24, 23, 25, 24, 22, 21, 23, 22],
-                        borderColor: '#F77F00',
-                        backgroundColor: 'rgba(255, 5, 49, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#F77F00',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            grid: { color: colors.gridColor },
-                            ticks: { color: colors.textColor }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: colors.textColor }
-                        }
-                    }
-                }
-            });
-
-            // Humidity Chart
-            const humidityCtx = document.getElementById('humidityChart').getContext('2d');
-            humidityChart = new Chart(humidityCtx, {
-                type: 'line',
-                data: {
-                    labels: ['1m', '2m', '3m', '4m', '5m', '6m', '7m', '8m', '9m', '10m', '11m', '12m'],
-                    datasets: [{
-                        label: 'Humidity (%)',
-                        data: [20, 21, 22, 24, 23, 25, 24, 22, 21, 23, 22, 20],
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#3b82f6',
-                        pointBorderColor: '#fff',
-                        pointBorderWidth: 2,
-                        pointRadius: 5,
-                        pointHoverRadius: 7
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            grid: { color: colors.gridColor },
-                            ticks: { color: colors.textColor }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: colors.textColor }
-                        }
-                    }
-                }
-            });
-        }
-
-        // Update chart colors when theme changes
-        function updateChartColors() {
-            const colors = getThemeColors();
-            
-            if (tempChart) {
-                tempChart.options.scales.y.grid.color = colors.gridColor;
-                tempChart.options.scales.y.ticks.color = colors.textColor;
-                tempChart.options.scales.x.ticks.color = colors.textColor;
-                tempChart.update();
-            }
-            
-            if (humidityChart) {
-                humidityChart.options.scales.y.grid.color = colors.gridColor;
-                humidityChart.options.scales.y.ticks.color = colors.textColor;
-                humidityChart.options.scales.x.ticks.color = colors.textColor;
-                humidityChart.update();
-            }
-        }
-
-        // Listen for theme changes
-        window.addEventListener('themeChanged', function() {
-            updateChartColors();
-        });
-
-        // Initialize charts when page loads
-        window.addEventListener('load', function() {
-            createCharts();
-        });
-
-        // Logout functionality - automatic logout and redirect to login_page.html
+        // Logout functionality
+        // supabase signOut is handled inside dashboard_page.js (module scope)
+        // so we just redirect here; dashboard_page.js exposes a global helper
         document.getElementById('logout-btn').addEventListener('click', async function(e) {
             e.preventDefault();
-            
             if (confirm('Are you sure you want to logout?')) {
-                try {
-                    // Sign out from Supabase (if using auth)
-                    const { error } = await supabase.auth.signOut();
-                    if (error) console.error('Logout error:', error);
-                } catch (err) {
-                    console.error('Logout failed:', err);
+                // Call the signout helper exposed by dashboard_page.js
+                if (window.mediaSafeLogout) {
+                    await window.mediaSafeLogout();
+                } else {
+                    window.location.href = 'login_page.html';
                 }
-                
-                console.log('Logging out...');
-                window.location.href = 'login_page.html';
             }
         });
     </script>
