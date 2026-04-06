@@ -259,3 +259,13 @@ async function initDashboard() {
 }
 
 initDashboard();
+
+// Expose logout helper for the inline script in dashboard_page.html
+window.mediaSafeLogout = async function() {
+    try {
+        await supabase.auth.signOut();
+    } catch (err) {
+        console.error('Logout error:', err);
+    }
+    window.location.href = 'login_page.html';
+};
