@@ -3,7 +3,11 @@ const MONITORING_SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOi
 const TABLE_NAME = 'status_logs';
 
 const { createClient } = supabase;
-const monitoringClient = createClient(MONITORING_SUPABASE_URL, MONITORING_SUPABASE_KEY);
+const monitoringClient = createClient(MONITORING_SUPABASE_URL, MONITORING_SUPABASE_KEY, {
+    realtime: {
+        params: { eventsPerSecond: 10 }
+    }
+});
 
 let userMap = {};
 let realtimeChannel = null;
@@ -57,11 +61,8 @@ async function fetchUsers() {
     const { data: users, error } = await monitoringClient
         .from('users')
         .select('id, first_name, last_name');
-
     if (!error && users) {
-        users.forEach(u => {
-            userMap[u.id] = `${u.first_name} ${u.last_name}`;
-        });
+        users.forEach(u => { userMap[u.id] = `${u.first_name} ${u.last_name}`; });
     }
 }
 
@@ -81,7 +82,7 @@ async function loadMonitoringStatusLogs() {
             .order('logged_at', { ascending: false });
 
         if (logsError) {
-            showToast(`Failed to load status logs: ${logsError.message || logsError.details || logsError}`, 'error');
+            showToast(`Failed to load: ${logsError.message}`, 'error');
             countSpan.textContent = 'Error';
             return;
         }
@@ -90,8 +91,7 @@ async function loadMonitoringStatusLogs() {
         updateCount();
 
     } catch (err) {
-        console.error('Unexpected error loading logs:', err);
-        showToast('Error loading monitoring logs.', 'error');
+        console.error('Load error:', err);
         countSpan.textContent = 'Error';
     }
 }
@@ -99,28 +99,29 @@ async function loadMonitoringStatusLogs() {
 function subscribeRealtime() {
     if (realtimeChannel) {
         monitoringClient.removeChannel(realtimeChannel);
+        realtimeChannel = null;
     }
 
+    console.log('[Realtime] Setting up channel...');
+
     realtimeChannel = monitoringClient
-        .channel('status_logs_changes')
+        .channel(`status_logs_realtime_${Date.now()}`) // unique name prevents stale channel conflicts
         .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: TABLE_NAME },
             async (payload) => {
+                // --- DIAGNOSTIC: confirm events are arriving ---
+                console.log('[Realtime] Event received:', payload.event, payload);
+
                 const tbody = document.getElementById('monitoring-table-body');
 
                 if (payload.event === 'INSERT') {
                     const newRow = payload.new;
-
-                    if (newRow.logged_by && !userMap[newRow.logged_by]) {
-                        await fetchUsers();
-                    }
+                    if (newRow.logged_by && !userMap[newRow.logged_by]) await fetchUsers();
 
                     const tr = buildRow(newRow);
-                    tr.style.animation = 'none';
                     tbody.insertBefore(tr, tbody.firstChild);
 
-                    // Highlight the new row briefly
                     tr.style.transition = 'background-color 1.5s ease';
                     tr.style.backgroundColor = 'rgba(16,185,129,0.15)';
                     setTimeout(() => tr.style.backgroundColor = '', 2000);
@@ -129,18 +130,14 @@ function subscribeRealtime() {
                     showToast('New status log entry received.');
 
                 } else if (payload.event === 'UPDATE') {
-                    const updated = payload.new;
-                    const existing = tbody.querySelector(`tr[data-id="${updated.id}"]`);
-
+                    const existing = tbody.querySelector(`tr[data-id="${payload.new.id}"]`);
                     if (existing) {
-                        const newTr = buildRow(updated);
+                        const newTr = buildRow(payload.new);
                         tbody.replaceChild(newTr, existing);
-
                         newTr.style.transition = 'background-color 1.5s ease';
                         newTr.style.backgroundColor = 'rgba(59,130,246,0.15)';
                         setTimeout(() => newTr.style.backgroundColor = '', 2000);
                     }
-
                     updateCount();
 
                 } else if (payload.event === 'DELETE') {
@@ -150,12 +147,20 @@ function subscribeRealtime() {
                 }
             }
         )
-        .subscribe((status) => {
+        .subscribe((status, err) => {
+            // --- DIAGNOSTIC: confirm subscription status ---
+            console.log('[Realtime] Subscription status:', status, err ?? '');
+
             if (status === 'SUBSCRIBED') {
-                console.log('Real-time subscription active.');
-            } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                console.warn('Real-time subscription issue:', status);
-                showToast('Real-time connection lost. Refresh to reconnect.', 'error');
+                console.log('[Realtime] ✅ Listening for changes on', TABLE_NAME);
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error('[Realtime] ❌ Channel error:', err);
+                showToast('Real-time error. Check console.', 'error');
+            } else if (status === 'TIMED_OUT') {
+                console.warn('[Realtime] ⚠️ Timed out. Retrying...');
+                setTimeout(subscribeRealtime, 3000);
+            } else if (status === 'CLOSED') {
+                console.warn('[Realtime] Channel closed.');
             }
         });
 }
