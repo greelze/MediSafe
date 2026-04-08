@@ -4,20 +4,13 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Threshold History — MediSafe</title>
-
-  <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-  <!-- CSS -->
   <link rel="stylesheet" href="dashboard_page.css">
   <link rel="stylesheet" href="history_page.css">
   <link rel="stylesheet" href="theme.css">
 
   <style>
-    /* UV stat box icon */
     .stat-icon.uv { background: rgba(251, 146, 60, 0.15); color: #f97316; }
-
-    /* ── Export modal: landscape layout ─────────────────────── */
     .export-modal-box {
       max-width: 780px !important;
       width: 90vw !important;
@@ -31,7 +24,6 @@
     .export-col-left  { flex: 0 0 310px; border-right: 1px solid var(--border-color, #e5e7eb); padding-right: 24px; }
     .export-col-right { flex: 1; }
 
-    /* Export range cards — vertical stack on right column */
     .export-range-group {
       display: flex;
       flex-direction: column;
@@ -66,8 +58,7 @@
     .export-range-icon { font-size: 1.1rem; flex-shrink: 0; }
     .export-range-name { font-size: 0.82rem; font-weight: 600; color: var(--text-primary, #111); flex: 1; }
     .export-range-desc { font-size: 0.7rem; color: var(--text-secondary, #6b7280); white-space: nowrap; }
-
-    /* Security recommendation note */
+    
     .export-security-note {
       display: flex;
       align-items: flex-start;
@@ -85,6 +76,9 @@
     .security-note-text { display: flex; flex-direction: column; gap: 2px; line-height: 1.5; }
     .security-note-text strong { display: block; font-size: 0.82rem; margin-bottom: 2px; color: #78350f; }
   </style>
+
+<link rel="icon" type="image/png" href="assets/medisafe_logo.jpg">
+  
 </head>
 <body>
   <div class="app-container">
