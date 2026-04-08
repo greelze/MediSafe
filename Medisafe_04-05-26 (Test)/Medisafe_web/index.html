@@ -200,10 +200,9 @@
       const confirmPassword = document.getElementById('confirmPassword').value;
       const firstName = this.elements.firstName.value;
       const lastName = this.elements.lastName.value;
-      const username = this.elements.username.value;
       const contact = this.elements.contact.value;
 
-      if (!email || !password || !firstName || !lastName || !username || !contact) {
+      if (!email || !password || !firstName || !lastName || !contact) {
         alert('Please fill in all fields.');
         return;
       }
@@ -214,7 +213,7 @@
       }
 
       // Store user data for later
-      userData = { firstName, lastName, username, contact };
+      userData = { firstName, lastName, contact };
       userEmail = email;
 
       // Sign up with email and password
@@ -225,7 +224,6 @@
           data: {
             first_name: firstName,
             last_name: lastName,
-            username: username,
             contact_number: contact
           }
         }
