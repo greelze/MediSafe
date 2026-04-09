@@ -6,7 +6,8 @@
   <title>MediSafe Login</title>
   <link rel="stylesheet" href="login_page.css" />
   <link rel="stylesheet" href="theme.css">
-  <link rel="icon" type="image/png" href="assets/medisafe_logo.jpg">
+  
+  
 </head>
 <body>
   <div class="container">
@@ -34,7 +35,7 @@
           </button>
 
         </div>
-        <a href="#" class="forgot-password">Forgot Password?</a>
+        <a href="#" id="forgot-password-link" class="forgot-password">Forgot Password?</a>
         <button class="login-btn" id="login-btn">Login</button>
         <button class="email-btn" id="email-btn">
           Sign in with
@@ -42,7 +43,7 @@
         </button>
         <p class="signup-text">
           Don't have an account? 
-          <a href="index.html" id="signup-link">Sign Up</a>
+          <a href="signup_page.html" id="signup-link">Sign Up</a>
         </p>
       </div>
     </div>
@@ -54,6 +55,17 @@
         <p id="emailError" class="error-message"></p>
         <button id="sendCodeBtn" class="send-code-btn">Send Verification Code</button>
         <button id="cancelGoogleBtn" class="cancel-btn">Cancel</button>
+      </div>
+    </div>
+
+    <div id="forgotPasswordModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Forgot Password</h2>
+        <p>Enter your email address to receive a password reset link:</p>
+        <input type="email" id="forgotPasswordEmail" placeholder="example@gmail.com" class="google-email-input" />
+        <p id="forgotPasswordError" class="error-message"></p>
+        <button id="sendForgotBtn" class="send-code-btn">Send Reset Link</button>
+        <button id="cancelForgotBtn" class="cancel-btn">Cancel</button>
       </div>
     </div>
 
@@ -156,11 +168,68 @@
 
     configurePasswordToggle('password');
 
+    function showForgotPasswordModal() {
+      document.getElementById('forgotPasswordModal').classList.remove('hidden');
+      document.getElementById('forgotPasswordEmail').value = '';
+      document.getElementById('forgotPasswordError').textContent = '';
+      document.getElementById('forgotPasswordEmail').focus();
+    }
 
+    function hideForgotPasswordModal() {
+      document.getElementById('forgotPasswordModal').classList.add('hidden');
+    }
+
+    async function sendForgotPasswordEmail() {
+      const emailInput = document.getElementById('forgotPasswordEmail');
+      const errorEl = document.getElementById('forgotPasswordError');
+      const email = emailInput.value.trim();
+      errorEl.textContent = '';
+
+      if (!email) {
+        errorEl.textContent = 'Please enter your email address';
+        return;
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errorEl.textContent = 'Please enter a valid email address';
+        return;
+      }
+
+      const btn = document.getElementById('sendForgotBtn');
+      btn.disabled = true;
+      btn.textContent = 'Sending...';
+
+      const redirectTo = window.location.href.replace(/login_page\.html(#.*)?$/, 'reset_password.html');
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+
+      if (error) {
+        console.error('Forgot password error:', error);
+        errorEl.textContent = 'Unable to send reset link. Please try again or contact support.';
+      } else {
+        errorEl.textContent = 'If your email is registered, a reset link has been sent. Check spam/junk if you don\'t see it.';
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Send Reset Link';
+    }
+
+    document.getElementById('forgot-password-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      showForgotPasswordModal();
+    });
+
+    document.getElementById('cancelForgotBtn').addEventListener('click', hideForgotPasswordModal);
+    document.getElementById('sendForgotBtn').addEventListener('click', sendForgotPasswordEmail);
+    document.getElementById('forgotPasswordEmail').addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') {
+        sendForgotPasswordEmail();
+      }
+    });
 
     document.getElementById('signup-link').addEventListener('click', function(e) {
       e.preventDefault();
-      window.location.href = 'index.html';
+      window.location.href = 'signup_page.html';
     });
 
 let currentEmail = '';
@@ -353,7 +422,7 @@ let currentEmail = '';
 
     async function performLogin() {
       const password = document.getElementById('password').value;
-      const { data , error } = await supabase.auth.signInWithPassword({ 
+      const { data, error } = await supabase.auth.signInWithPassword({ 
         email: currentEmail, 
         password 
       });
@@ -368,6 +437,36 @@ let currentEmail = '';
       let loginCount = parseInt(localStorage.getItem(`loginCount_${currentEmail}`) || '0');
       loginCount++;
       localStorage.setItem(`loginCount_${currentEmail}`, loginCount.toString());
+
+      try {
+        const metadata = data?.user?.user_metadata || {};
+        const newId = await insertUserRow(
+          currentEmail,
+          metadata.first_name || "",
+          metadata.last_name || "",
+          metadata.contact_number || ""
+        );
+        
+        if (newId) {
+          localStorage.setItem('currentUserId', String(newId));
+        }
+      } catch (profileError) {
+        console.error('❌ Login profile row insertion error:', profileError);
+        console.error('❌ Error code:', profileError.code || 'N/A');
+        console.error('❌ Error hint:', profileError.hint || 'N/A');
+        
+        let userMessage = 'Profile setup error: ' + (profileError.message || 'Please contact support.');
+        if (profileError.code === 'PGRST301') {
+          userMessage = '⚠️ Permission error: Check your Supabase RLS policies on the users table.';
+        } else if (profileError.message && profileError.message.includes('permission')) {
+          userMessage = '⚠️ Permission error. Check Supabase RLS policies on the users table.';
+        }
+        
+        alert(userMessage);
+        hideCaptcha();
+        return;
+      }
+
       localStorage.setItem('currentUserEmail', currentEmail);
 
       hideCaptcha();
@@ -425,6 +524,71 @@ let currentEmail = '';
         console.error('Error verifying OTP:', error);
         return false;
       }
+    }
+
+    // ================================
+    // INSERT ROW INTO CUSTOM users TABLE
+    // Called after OTP is verified successfully.
+    // ================================
+    async function insertUserRow(email, firstName = "", lastName = "", contact = "", username = null) {
+      try {
+        // Check first if a row already exists for this email
+        const { data: existing } = await supabase
+          .from('users')
+          .select('id, first_name, last_name, phone_number')
+          .eq('email', email)
+          .single();
+
+        if (existing) {
+          const updates = {};
+          if (firstName && !existing.first_name) updates.first_name = firstName;
+          if (lastName && !existing.last_name) updates.last_name = lastName;
+          if (contact && !existing.phone_number) updates.phone_number = contact;
+
+          if (Object.keys(updates).length > 0) {
+            const { error: updateError } = await supabase
+              .from('users')
+              .update(updates)
+              .eq('id', existing.id);
+
+            if (updateError) {
+              console.warn('⚠️ Failed to update existing user row:', updateError.message);
+            } else {
+              console.log('✅ Existing user row updated with missing fields:', existing.id);
+            }
+          }
+
+          console.log('✅ User row already exists in users table:', existing.id);
+          return existing.id;
+        }
+      } catch (_) {
+        // .single() throws if no row found — that's fine, proceed to insert
+      }
+
+      // ✅ Insert new row into users table
+      console.log('🔍 Attempting to insert new user row with data:', { email, firstName, lastName, contact });
+      const { data, error } = await supabase
+        .from('users')
+        .insert([{
+          email        : email,
+          first_name   : firstName || null,
+          last_name    : lastName || null,
+          phone_number : contact || null,
+          auth_provider: 'email_otp',
+          is_verified  : true,
+          profile_image: null
+        }])
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('❌ Failed to insert user row:', error.message);
+        console.error('❌ Full error details:', error);
+        throw error;
+      }
+
+      console.log('✅ User row inserted into users table. id:', data.id);
+      return data.id;
     }
 
     document.getElementById('email-btn').addEventListener('click', function() {
@@ -509,16 +673,42 @@ let currentEmail = '';
       btn.disabled = true;
       btn.textContent = 'Verifying...';
 
-      verifyOTPCode(googleEmail, enteredCode).then(success => {
+      verifyOTPCode(googleEmail, enteredCode).then(async success => {
         if (success) {
           document.getElementById('verificationError').textContent = '';
-          alert('Email verified successfully!');
-          hideCodeVerificationModal();
+          
+          try {
+            const metadata = (await supabase.auth.getUser()).data?.user?.user_metadata || {};
+            const newId = await insertUserRow(
+              googleEmail,
+              metadata.first_name || "",
+              metadata.last_name || "",
+              metadata.contact_number || ""
+            );
+            
+            if (newId) {
+              localStorage.setItem('currentUserId', String(newId));
+            }
 
-          // ✅ Save email so profile_page.js knows who logged in
-          localStorage.setItem('currentUserEmail', googleEmail);
+            localStorage.setItem('currentUserEmail', googleEmail);
 
-          window.location.href = 'dashboard_page.html';
+            alert('Email verified successfully!');
+            hideCodeVerificationModal();
+            window.location.href = 'dashboard_page.html';
+          } catch (profileError) {
+            console.error('❌ OTP profile row insertion error:', profileError);
+            console.error('❌ Error code:', profileError.code || 'N/A');
+            console.error('❌ Error hint:', profileError.hint || 'N/A');
+            
+            let userMessage = 'Profile setup error: ' + (profileError.message || 'Please contact support.');
+            if (profileError.code === 'PGRST301') {
+              userMessage = '⚠️ Permission error: Check your Supabase RLS policies on the users table.';
+            } else if (profileError.message && profileError.message.includes('permission')) {
+              userMessage = '⚠️ Permission error. Check Supabase RLS policies on the users table.';
+            }
+            
+            document.getElementById('verificationError').textContent = userMessage;
+          }
         } else {
           document.getElementById('verificationError').textContent = 'Invalid code. Please try again.';
         }
