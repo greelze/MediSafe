@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="monitoring_log.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <link rel="icon" type="image/png" href="assets/medisafe_logo.jpg">
 </head>
 <body>
     <div class="app-container">
@@ -20,6 +19,7 @@
                 <a href="dashboard_page.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-text">Home</span></a>
                 <a href="history_page.html"   class="nav-item"><span class="nav-icon">🕒</span><span class="nav-text">Threshold History</span></a>
                 <a href="analytics_page.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-text">Analytics</span></a>
+                <a href="sensors_location.html" class="nav-item"><span class="nav-icon">📍</span><span class="nav-text">Sensor Location</span></a>
                 <a href="audit_trail_local.html" class="nav-item"><span class="nav-icon">📋</span><span class="nav-text">Audit Trail</span></a>
                 <a href="monitoring_log.html" class="nav-item active"><span class="nav-icon">🩺</span><span class="nav-text">Monitoring Log</span></a>
                 <a href="settings_page.html"  class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-text">Settings</span></a>
@@ -29,12 +29,25 @@
                 <a href="login_page.html" class="nav-item logout-item"><span class="nav-icon">🚪</span><span class="nav-text">Logout</span></a>
             </div>
         </div>
+
         <div class="main-content">
+            <div class="header">
+                <span id="page-title">Monitoring Log 🩺</span>
+                <div class="header-actions">
+                    <button class="refresh-btn" id="refresh-btn">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <div class="info-box">
+                <p>This is a read-only monitoring panel linked to <strong>status_logs</strong> from Supabase. It reflects readings added by mobile users (no manual add/edit here).</p>
+            </div>
+
             <div class="monitoring-card">
                 <div class="monitoring-header">
                     <h2 class="monitoring-title">Latest Status Logs</h2>
                     <span class="record-count" id="record-count">0 entries</span>
                 </div>
+
                 <div class="monitoring-table-wrapper">
                     <table class="monitoring-table">
                         <thead>
@@ -58,7 +71,9 @@
             </div>
         </div>
     </div>
+
     <div class="toast" id="toast"></div>
+
     <script src="theme.js"></script>
     <script src="monitoring_log.js"></script>
 </body>
