@@ -1,4 +1,4 @@
-﻿/* Reset */
+/* Reset */
 * {
   margin: 0;
   padding: 0;
@@ -97,26 +97,35 @@ input {
 }
 
 .password-field {
-  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
   margin-top: 6px;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0 12px;
 }
 
 .password-field input {
+  flex: 1;
+  width: auto;
   margin-top: 0;
-  padding-right: 60px;
+  border: none;
+  padding: 12px 0;
+  font-size: 0.95rem;
+  outline: none;
 }
 
 .password-field .toggle-password {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
   border: none;
   background: none;
   cursor: pointer;
   color: #4a9fd8;
   transition: color 0.3s;
+  padding: 0 6px;
 }
+
 
 .password-field .toggle-password:hover {
   color: #05318a;
@@ -235,12 +244,13 @@ button,
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
   text-align: center;
   border: 1px solid rgba(255, 255, 255, 0.2);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
 .modal-content h2 {
   font-size: 2rem;
-  background: linear-gradient(135deg, #ff5151, #ff299b);
+  background: linear-gradient(135deg, #f42f2f, #ff2d2d);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
