@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Sensor Locations — MediSafe</title>
+
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="sensors_location.css">
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="dashboard_page.css">
+
+</head>
+<body>
+  <div class="app-container">
+    <div class="sidebar">
+      <div class="logo-section">
+        <div class="logo">🏥</div>
+        <div class="brand-name">MediSafe</div>
+      </div>
+
+      <div class="nav-section">
+        <a href="dashboard_page.html" class="nav-item">
+          <span class="nav-icon">🏠</span>
+          <span class="nav-text">Home</span>
+        </a>
+        <a href="history_page.html" class="nav-item">
+          <span class="nav-icon">🕒</span>
+          <span class="nav-text">Threshold History</span>
+        </a>
+        <a href="analytics_page.html" class="nav-item">
+          <span class="nav-icon">📊</span>
+          <span class="nav-text">Analytics</span>
+        </a>
+        <a href="sensors_location.html" class="nav-item active">
+          <span class="nav-icon">📍</span>
+          <span class="nav-text">Sensor Location</span>
+        </a>
+        <a href="audit_trail_local.html" class="nav-item">
+          <span class="nav-icon">📋</span>
+          <span class="nav-text">Audit Trail</span>
+        </a>
+        <a href="monitoring_log.html" class="nav-item">
+                    <span class="nav-icon">🩺</span>
+                    <span class="nav-text">Monitoring Log</span>
+                </a>
+        <a href="settings_page.html" class="nav-item">
+          <span class="nav-icon">⚙️</span>
+          <span class="nav-text">Settings</span>
+        </a>
+      </div>
+      
+      <div class="profile-section">
+        <a href="profile_page.html" class="profile-link">
+          <div class="avatar-placeholder"></div>
+        </a>
+        <a href="login_page.html" class="nav-item logout-item">
+          <span class="nav-icon">🚪</span>
+          <span class="nav-text">Logout</span>
+        </a>
+      </div>
+    </div>
+    <!-- Main Content -->
+    <div class="main-content">
+      <div class="header">
+        <span id="page-title">Sensor Locations</span>
+      </div>
+
+        <div class="loc-buttons">
+          <button class="filter-btn active" id="addLocBtn">Add Location</button>
+        </div>
+
+      <div class="content-body">
+
+        <!-- Sensor Location Module -->
+        <div class="sensor_module">
+          <div class="sensor-card">
+            <div class="sensor-card-header">
+              <table class="modern-table">
+                <thead>
+                  <tr>
+                    <th>Active</th>
+                    <th>Location</th>
+                    <th>Created At</th>
+                    <th>Temperature</th>
+                    <th>Humidity</th>
+                    <th>UV Index</th>
+                    <th>Delete</th>
+                  </tr>
+                </thead>
+                <tbody id="data-table">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Location Modal -->
+  <div id="locationModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Add New Sensor Location</h2>
+        <button class="close-btn" id="closeModal">&times;</button>
+      </div>
+      <form id="locationForm">
+        <div class="form-group">
+          <label for="locName">Location Name</label>
+          <input type="text" id="locName" placeholder="e.g. Pharmacy Fridge" required>
+        </div>
+        <div class="form-group">
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+          <button type="submit" class="btn-primary">Save Location</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div id="deleteModal" class="custom-modal" style="display: none;">
+    <div class="modal-content">
+      <h3 style="color: black; margin-bottom: 10px;">Confirm Deletion</h3>
+      <p style="color: #4b5563;">Are you sure you want to delete <br><strong id="deleteLocName" style="color: #111827;"></strong>?</p>
+      <div style="margin-top: 25px; display: flex; justify-content: center; gap: 15px;">
+        <button id="cancelDelete" class="btn-secondary">Cancel</button>
+        <button id="confirmDelete" class="btn-danger">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div id="successModal" class="custom-modal" style="display: none;">
+    <div class="modal-content" style="border-top: 5px solid #3ecf8e;">
+      <div style="font-size: 50px; color: #3ecf8e; margin-bottom: 10px;">✅</div>
+      <h3 style="color: black;">Success!</h3>
+      <p style="color: #4b5563;">Location saved successfully!</p>
+      <div style="margin-top: 20px;">
+        <button id="closeSuccessBtn" class="btn-primary" style="width: 100%;">Great!</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gathering / Switching Location Modal -->
+  <div id="gatheringModal" class="custom-modal" style="display: none;">
+    <div class="modal-content">
+      <div style="font-size: 50px; color: #3b82f6; margin-bottom: 10px;">📊</div>
+      <h3 style="color: black;">Switching Location</h3>
+      <p style="color: #4b5563;">Gathering data for <strong id="gatheringLocName"></strong>...</p>
+      <div style="margin-top: 20px;">
+        <button id="closeGatheringBtn" class="btn-secondary" style="width: 100%;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="profile_sync.js"></script> 
+  <script type="module" src="sensors_location.js"></script>
+  <script src="theme.js"></script>
+</body>
+</html>
