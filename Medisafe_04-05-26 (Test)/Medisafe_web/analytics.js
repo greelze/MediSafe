@@ -229,16 +229,33 @@ function initializeChart() {
 
 async function loadAnalyticsData() {
   try {
-    // Always load ALL sensor data regardless of active location
-    // Stats, charts, and reports show totals across ALL locations
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select("*");
+    // Supabase caps queries at 1,000 rows by default.
+    // We page through in batches of 1,000 until we have everything.
+    const PAGE_SIZE = 1000;
+    let allRows = [];
+    let from = 0;
+    let keepGoing = true;
 
-    if (error) throw error;
+    while (keepGoing) {
+      const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .select("*")
+        .range(from, from + PAGE_SIZE - 1);
 
-    analyticsData = (data || []).slice();
-    console.log("Loaded analytics data:", analyticsData.length, analyticsData);
+      if (error) throw error;
+
+      const batch = data || [];
+      allRows = allRows.concat(batch);
+
+      if (batch.length < PAGE_SIZE) {
+        keepGoing = false; // last page — we're done
+      } else {
+        from += PAGE_SIZE;
+      }
+    }
+
+    analyticsData = allRows;
+    console.log("Loaded analytics data:", analyticsData.length, "rows across", Math.ceil(analyticsData.length / PAGE_SIZE), "page(s)");
 
     if (analyticsData.length === 0) {
       console.warn("No analytics data found; using sample fallback data.");
