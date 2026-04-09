@@ -4,9 +4,7 @@ const TABLE_NAME = 'status_logs';
 
 const { createClient } = supabase;
 const monitoringClient = createClient(MONITORING_SUPABASE_URL, MONITORING_SUPABASE_KEY, {
-    realtime: {
-        params: { eventsPerSecond: 10 }
-    }
+    realtime: { params: { eventsPerSecond: 10 } }
 });
 
 let userMap = {};
@@ -82,7 +80,7 @@ async function loadMonitoringStatusLogs() {
             .order('logged_at', { ascending: false });
 
         if (logsError) {
-            showToast(`Failed to load: ${logsError.message}`, 'error');
+            showToast(`Failed to load status logs: ${logsError.message}`, 'error');
             countSpan.textContent = 'Error';
             return;
         }
@@ -92,6 +90,7 @@ async function loadMonitoringStatusLogs() {
 
     } catch (err) {
         console.error('Load error:', err);
+        showToast('Error loading monitoring logs.', 'error');
         countSpan.textContent = 'Error';
     }
 }
@@ -102,20 +101,16 @@ function subscribeRealtime() {
         realtimeChannel = null;
     }
 
-    console.log('[Realtime] Setting up channel...');
-
     realtimeChannel = monitoringClient
-    .channel('status_logs_realtime') // unique name prevents stale channel conflicts
+        .channel('status_logs_realtime')
         .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: TABLE_NAME },
             async (payload) => {
-                // --- DIAGNOSTIC: confirm events are arriving ---
-                console.log('[Realtime] Event received:', payload.event, payload);
-
+                const eventType = payload.eventType || payload.event;
                 const tbody = document.getElementById('monitoring-table-body');
 
-                if (payload.event === 'INSERT') {
+                if (eventType === 'INSERT') {
                     const newRow = payload.new;
                     if (newRow.logged_by && !userMap[newRow.logged_by]) await fetchUsers();
 
@@ -129,7 +124,7 @@ function subscribeRealtime() {
                     updateCount();
                     showToast('New status log entry received.');
 
-                } else if (payload.event === 'UPDATE') {
+                } else if (eventType === 'UPDATE') {
                     const existing = tbody.querySelector(`tr[data-id="${payload.new.id}"]`);
                     if (existing) {
                         const newTr = buildRow(payload.new);
@@ -140,7 +135,7 @@ function subscribeRealtime() {
                     }
                     updateCount();
 
-                } else if (payload.event === 'DELETE') {
+                } else if (eventType === 'DELETE') {
                     const deleted = tbody.querySelector(`tr[data-id="${payload.old.id}"]`);
                     if (deleted) deleted.remove();
                     updateCount();
@@ -148,19 +143,13 @@ function subscribeRealtime() {
             }
         )
         .subscribe((status, err) => {
-            // --- DIAGNOSTIC: confirm subscription status ---
-            console.log('[Realtime] Subscription status:', status, err ?? '');
-
-            if (status === 'SUBSCRIBED') {
-                console.log('[Realtime] ✅ Listening for changes on', TABLE_NAME);
-            } else if (status === 'CHANNEL_ERROR') {
-                console.error('[Realtime] ❌ Channel error:', err);
-                showToast('Real-time error. Check console.', 'error');
-            } else if (status === 'TIMED_OUT') {
-                console.warn('[Realtime] ⚠️ Timed out. Retrying...');
+            if (status === 'CHANNEL_ERROR') {
+                console.error('[Realtime] Channel error:', err);
+                showToast('Real-time error. Retrying...', 'error');
                 setTimeout(subscribeRealtime, 3000);
-            } else if (status === 'CLOSED') {
-                console.warn('[Realtime] Channel closed.');
+            } else if (status === 'TIMED_OUT') {
+                console.warn('[Realtime] Timed out. Retrying...');
+                setTimeout(subscribeRealtime, 3000);
             }
         });
 }
@@ -168,11 +157,6 @@ function subscribeRealtime() {
 document.addEventListener('DOMContentLoaded', async () => {
     await loadMonitoringStatusLogs();
     subscribeRealtime();
-
-    document.getElementById('refresh-btn').addEventListener('click', async () => {
-        await loadMonitoringStatusLogs();
-        subscribeRealtime();
-    });
 
     window.addEventListener('beforeunload', () => {
         if (realtimeChannel) monitoringClient.removeChannel(realtimeChannel);
