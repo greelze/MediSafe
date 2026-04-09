@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MediSafe Sign Up</title>
   <link rel="stylesheet" href="signup_page.css">
-  <link rel="icon" type="image/png" href="assets/medisafe_logo.jpg">
 </head>
 <body>
   <div class="container">
@@ -89,8 +88,46 @@
     let userEmail = '';
     let userData = {};
 
+    const signupForm = document.getElementById('signup-form');
+    const signupButton = document.querySelector('.signup-btn');
+    const verificationModal = document.getElementById('verification-modal');
+    const verificationEmail = document.getElementById('verification-email');
+    const verificationCodeInput = document.getElementById('verification-code');
+    const verifyBtn = document.getElementById('verify-btn');
+    const resendBtn = document.getElementById('resend-btn');
+    const closeModalBtn = document.getElementById('close-modal');
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const openEye = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M1 12C1 12 5 4 12 4C19 4 23 12 23 12C23 12 19 20 12 20C5 20 1 12 1 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>';
     const closedEye = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2.99902 3L20.999 21M9.8433 9.91364C9.32066 10.4536 8.99902 11.1892 8.99902 12C8.99902 13.6569 10.3422 15 12 15C12.8215 15 13.5667 14.669 14.1086 14.133M6.49902 6.64715C4.59972 7.90034 3.15305 9.78394 2.45703 12C3.73128 16.0571 7.52159 19 11.9992 19C13.9881 19 15.8414 18.4194 17.3988 17.4184M10.999 5.04939C11.328 5.01673 11.6617 5 11.9992 5C16.4769 5 20.2672 7.94291 21.5414 12C21.2607 12.894 20.8577 13.7338 20.3522 14.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    function setSignupLoading(isLoading) {
+      if (!signupButton) return;
+      signupButton.disabled = isLoading;
+      signupButton.textContent = isLoading ? 'Signing Up…' : 'Sign Up';
+    }
+
+    function setVerifyLoading(isLoading) {
+      if (!verifyBtn) return;
+      verifyBtn.disabled = isLoading;
+      verifyBtn.textContent = isLoading ? 'Verifying…' : 'Verify';
+    }
+
+    function showVerificationModal(email) {
+      if (!verificationModal) return;
+      verificationEmail.textContent = email;
+      verificationCodeInput.value = '';
+      verificationModal.style.display = 'flex';
+      verificationModal.style.justifyContent = 'center';
+      verificationModal.style.alignItems = 'center';
+      if (signupForm) signupForm.style.display = 'none';
+    }
+    
+    function hideVerificationModal() {
+      if (!verificationModal) return;
+      verificationModal.style.display = 'none';
+      if (signupForm) signupForm.style.display = 'block';
+    }
 
     // Toggle password visibility
     function togglePassword(id) {
@@ -131,12 +168,6 @@
     configurePasswordToggle('confirmPassword');
 
 
-    // Hide verification modal
-    function hideVerificationModal() {
-      document.getElementById('verification-modal').style.display = 'none';
-      document.getElementById('signup-form').style.display = 'block';
-    }
-
     // ================================
     // INSERT ROW INTO CUSTOM users TABLE
     // Called after OTP is verified successfully.
@@ -146,14 +177,36 @@
     async function insertUserRow(email, firstName, lastName, contact) {
       try {
         // Check first if a row already exists for this email
-        const { data: existing } = await supabase
+        const { data: existing, error: existingError } = await supabase
           .from('users')
-          .select('id')
+          .select('id, first_name, last_name, phone_number')
           .eq('email', email)
           .single();
 
         if (existing) {
-          // Row already exists — no need to insert again
+          const needsUpdate =
+            (firstName && !existing.first_name) ||
+            (lastName && !existing.last_name) ||
+            (contact && !existing.phone_number);
+
+          if (needsUpdate) {
+            const updates = {};
+            if (firstName && !existing.first_name) updates.first_name = firstName;
+            if (lastName && !existing.last_name) updates.last_name = lastName;
+            if (contact && !existing.phone_number) updates.phone_number = contact;
+
+            const { error: updateError } = await supabase
+              .from('users')
+              .update(updates)
+              .eq('id', existing.id);
+
+            if (updateError) {
+              console.warn('⚠️ Failed to update existing user row:', updateError.message);
+            } else {
+              console.log('✅ Existing user row updated with missing profile fields:', existing.id);
+            }
+          }
+
           console.log('✅ User row already exists in users table:', existing.id);
           return existing.id;
         }
@@ -162,6 +215,7 @@
       }
 
       // ✅ Insert new row into users table
+      console.log('🔍 Attempting to insert new user row with data:', { email, firstName, lastName, contact });
       const { data, error } = await supabase
         .from('users')
         .insert([{
@@ -178,7 +232,8 @@
 
       if (error) {
         console.error('❌ Failed to insert user row:', error.message);
-        return null;
+        console.error('❌ Full error details:', error);
+        throw error;
       }
 
       console.log('✅ User row inserted into users table. id:', data.id);
@@ -195,15 +250,20 @@
         return;
       }
 
-      const email = document.getElementById('email').value;
+      const email = document.getElementById('email').value.trim();
       const password = document.getElementById('password').value;
       const confirmPassword = document.getElementById('confirmPassword').value;
-      const firstName = this.elements.firstName.value;
-      const lastName = this.elements.lastName.value;
-      const contact = this.elements.contact.value;
+      const firstName = this.elements.firstName.value.trim();
+      const lastName = this.elements.lastName.value.trim();
+      const contact = this.elements.contact.value.trim();
 
       if (!email || !password || !firstName || !lastName || !contact) {
         alert('Please fill in all fields.');
+        return;
+      }
+
+      if (!emailRegex.test(email)) {
+        alert('Please enter a valid email address.');
         return;
       }
 
@@ -212,103 +272,125 @@
         return;
       }
 
-      // Store user data for later
+      setSignupLoading(true);
       userData = { firstName, lastName, contact };
       userEmail = email;
 
-      // Sign up with email and password
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            contact_number: contact
+      try {
+        const { data, error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: {
+              first_name: firstName,
+              last_name: lastName,
+              contact_number: contact
+            }
           }
-        }
-      });
-      console.log('SignUp response:', data, error);
-      if (error) {
-        alert('Signup error: ' + error.message);
-        return;
-      }
+        });
 
-      // If email already confirmed (rare case)
-      if (data.user && data.user.email_confirmed_at) {
-        console.log('Email already confirmed, inserting user row and redirecting...');
-
-        // ✅ Insert into users table
-        const newId = await insertUserRow(email, firstName, lastName, contact);
-        if (newId) {
-          localStorage.setItem('currentUserEmail', email);
-          localStorage.setItem('currentUserId',    String(newId));
+        console.log('SignUp response:', data, error);
+        if (error) {
+          throw error;
         }
 
-        alert('Account created! Logging you in...');
-        window.location.href = 'dashboard_page.html';
-      } else {
-        console.log('Email not confirmed, showing OTP modal...');
-        document.getElementById('verification-email').textContent = email;
-        const modal = document.getElementById('verification-modal');
-        modal.style.display        = 'flex';
-        modal.style.justifyContent = 'center';
-        modal.style.alignItems     = 'center';
-        document.getElementById('signup-form').style.display = 'none';
+        const alreadyConfirmed = data?.user?.email_confirmed_at;
+        const userIsCreated = !!(data?.user);
+
+        if (userIsCreated && alreadyConfirmed) {
+          console.log('Email already confirmed, inserting user row and redirecting...');
+          const newId = await insertUserRow(email, firstName, lastName, contact);
+          if (newId) {
+            localStorage.setItem('currentUserEmail', email);
+            localStorage.setItem('currentUserId', String(newId));
+          }
+          alert('Account created! Logging you in...');
+          window.location.href = 'dashboard_page.html';
+        } else {
+          console.log('Email not confirmed, showing OTP modal...');
+          showVerificationModal(email);
+        }
+      } catch (err) {
+        alert('Signup error: ' + (err.message || 'Please try again.'));
+      } finally {
+        setSignupLoading(false);
       }
     });
 
     // Verify OTP code
     document.getElementById('verify-btn').addEventListener('click', async function() {
-      const code = document.getElementById('verification-code').value;
+      const code = verificationCodeInput.value.trim();
 
       if (!code || code.length !== 6) {
         alert('Please enter a valid 6-digit code.');
         return;
       }
 
-      const { data, error } = await supabase.auth.verifyOtp({
-        email: userEmail,
-        token: code,
-        type : 'signup'
-      });
+      setVerifyLoading(true);
+      try {
+        const { data, error } = await supabase.auth.verifyOtp({
+          email: userEmail,
+          token: code,
+          type : 'signup'
+        });
 
-      if (error) {
-        alert('Verification error: ' + error.message);
-        return;
-      }
+        if (error) {
+          throw error;
+        }
 
-      // ✅ Insert row into your custom users table NOW that email is verified
-      const newId = await insertUserRow(
-        userEmail,
-        userData.firstName,
-        userData.lastName,
-        userData.contact
-      );
+        console.log('✅ OTP verified. Attempting to create profile row...');
+        const newId = await insertUserRow(
+          userEmail,
+          userData.firstName,
+          userData.lastName,
+          userData.contact
+        );
 
-      // ✅ Save session so profile_page.js and profile_sync.js can load the profile
-      localStorage.setItem('currentUserEmail', userEmail);
-      if (newId) {
+        if (!newId) {
+          console.error('❌ insertUserRow returned null or empty');
+          throw new Error('Unable to create profile row. Please check Supabase RLS policies on the users table.');
+        }
+
+        localStorage.setItem('currentUserEmail', userEmail);
         localStorage.setItem('currentUserId', String(newId));
-      }
 
-      alert('Email verified! Logging you in...');
-      window.location.href = 'dashboard_page.html';
+        alert('Email verified! Logging you in...');
+        window.location.href = 'dashboard_page.html';
+      } catch (error) {
+        console.error('❌ Verification catch error:', error);
+        console.error('❌ Error code:', error.code || 'N/A');
+        console.error('❌ Error hint:', error.hint || 'N/A');
+        
+        let userMessage = 'Verification error: ' + (error.message || 'Please try again.');
+        if (error.code === 'PGRST301') {
+          userMessage = '⚠️ Permission error: Your Supabase RLS policies are too restrictive. Please allow authenticated users to INSERT into the users table.';
+        } else if (error.message && error.message.includes('permission')) {
+          userMessage = '⚠️ Permission error detected. Check Supabase RLS policies on the users table.';
+        }
+        
+        alert(userMessage);
+      } finally {
+        setVerifyLoading(false);
+      }
     });
 
-    // Resend verification code
     document.getElementById('resend-btn').addEventListener('click', async function(e) {
       e.preventDefault();
-      const { error } = await supabase.auth.resend({ type: 'signup', email: userEmail });
-      if (error) {
-        alert('Resend error: ' + error.message);
+      if (!userEmail) {
+        alert('Unable to resend code. Please refresh and try again.');
         return;
       }
-      alert('Code resent to ' + userEmail);
+
+      try {
+        const { error } = await supabase.auth.resend({ type: 'signup', email: userEmail });
+        if (error) throw error;
+        alert('Code resent to ' + userEmail);
+      } catch (err) {
+        alert('Resend error: ' + (err.message || 'Please try again.'));
+      }
     });
 
-    // Close modal
-    document.getElementById('close-modal').addEventListener('click', function() {
+    closeModalBtn.addEventListener('click', function() {
       hideVerificationModal();
     });
   </script>
