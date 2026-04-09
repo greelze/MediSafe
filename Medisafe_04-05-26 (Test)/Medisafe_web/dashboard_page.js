@@ -4,7 +4,7 @@ const SUPABASE_URL = "https://elhshkzfiqmyisxavnsh.supabase.co";
 const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsaHNoa3pmaXFteWlzeGF2bnNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MDg1OTIsImV4cCI6MjA3NDI4NDU5Mn0.0AaxR_opZSkwz2rRwJ21kmuZ7lrOPglLUIgb8nSnr1k";
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const TABLE_NAME = "sensors";
-const VISIBLE_POINTS = 20;
+const VISIBLE_POINTS = 10;
 
 let labelCounter = 1;
 let lastRowId = 0;
