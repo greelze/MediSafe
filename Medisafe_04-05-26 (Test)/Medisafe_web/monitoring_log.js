@@ -105,7 +105,7 @@ function subscribeRealtime() {
     console.log('[Realtime] Setting up channel...');
 
     realtimeChannel = monitoringClient
-        .channel(`status_logs_realtime_${Date.now()}`) // unique name prevents stale channel conflicts
+    .channel('status_logs_realtime') // unique name prevents stale channel conflicts
         .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: TABLE_NAME },
