@@ -30,12 +30,10 @@ async function loadMonitoringStatusLogs() {
     const emptyState = document.getElementById('empty-state');
     const countSpan = document.getElementById('record-count');
 
-    tbody.innerHTML = '';
-    emptyState.style.display = 'none';
-    countSpan.textContent = 'Loading...';
+    // Remove the visual 'Loading...' text to make real-time updates seamless
+    if (tbody.innerHTML === '') countSpan.textContent = 'Loading...'; 
 
     try {
-        // Step 1: Fetch status logs
         const { data: logs, error: logsError } = await monitoringClient
             .from(TABLE_NAME)
             .select('id, logged_at, temperature, humidity, uv_index, notes, logged_by')
@@ -43,18 +41,20 @@ async function loadMonitoringStatusLogs() {
 
         if (logsError) {
             console.error('Supabase fetch error:', logsError);
-            showToast(`Failed to load status logs: ${logsError.message || logsError.details || logsError}`, 'error');
+            showToast(`Failed to load status logs: ${logsError.message}`, 'error');
             countSpan.textContent = 'Error';
             return;
         }
 
         if (!logs || logs.length === 0) {
+            tbody.innerHTML = '';
             emptyState.style.display = 'block';
             countSpan.textContent = '0 entries';
             return;
         }
 
-        // Step 2: Fetch all users and build a lookup map { id -> full name }
+        emptyState.style.display = 'none';
+
         const { data: users, error: usersError } = await monitoringClient
             .from('users')
             .select('id, first_name, last_name');
@@ -66,7 +66,8 @@ async function loadMonitoringStatusLogs() {
             });
         }
 
-        // Step 3: Render rows
+        tbody.innerHTML = ''; // Clear table right before appending new data
+
         logs.forEach(row => {
             const user = userMap[row.logged_by] || 'Unknown';
             const tr = document.createElement('tr');
@@ -90,7 +91,22 @@ async function loadMonitoringStatusLogs() {
     }
 }
 
+function subscribeRealtime() {
+    monitoringClient
+        .channel('status-logs-channel')
+        .on(
+            'postgres_changes',
+            { event: 'INSERT', schema: 'public', table: TABLE_NAME },
+            (payload) => {
+                // When a new log is inserted into Supabase, reload the table and show a toast
+                showToast('New monitoring log received!');
+                loadMonitoringStatusLogs();
+            }
+        )
+        .subscribe();
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     loadMonitoringStatusLogs();
-    document.getElementById('refresh-btn').addEventListener('click', loadMonitoringStatusLogs);
+    subscribeRealtime();
 });
