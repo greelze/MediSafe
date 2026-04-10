@@ -156,8 +156,7 @@ body {
 .audit-table th:nth-child(6),
 .audit-table td:nth-child(6),  /* Category */
 .audit-table th:nth-child(7),
-.audit-table td:nth-child(7),
-{
+.audit-table td:nth-child(7){
     text-align: center;
 }
 
