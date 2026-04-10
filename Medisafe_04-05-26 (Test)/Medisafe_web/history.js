@@ -142,14 +142,35 @@ export async function loadHistory() {
   container.innerHTML = `<tr><td colspan="6" style="padding:20px;color:gray;">Loading...</td></tr>`;
 
   try {
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select("*")
-      .order("recorded_id", { ascending: false });
+    // Supabase caps queries at 1,000 rows by default.
+    // Page through in batches of 1,000 until all rows are fetched.
+    const PAGE_SIZE = 1000;
+    let allRows  = [];
+    let from     = 0;
+    let keepGoing = true;
 
-    if (error) throw error;
+    while (keepGoing) {
+      const { data, error } = await supabase
+        .from(TABLE_NAME)
+        .select("*")
+        .order("recorded_id", { ascending: false })
+        .range(from, from + PAGE_SIZE - 1);
 
-    allData = data || [];
+      if (error) throw error;
+
+      const batch = data || [];
+      allRows = allRows.concat(batch);
+
+      if (batch.length < PAGE_SIZE) {
+        keepGoing = false; // last page — we're done
+      } else {
+        from += PAGE_SIZE;
+      }
+    }
+
+    console.log(`History: loaded ${allRows.length} total rows.`);
+
+    allData = allRows;
     renderPage(1);
     updateStatBoxes(allData);
 
