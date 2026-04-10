@@ -6,24 +6,20 @@ document.addEventListener("DOMContentLoaded", function () {
     const SUPABASE_URL      = "https://elhshkzfiqmyisxavnsh.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsaHNoa3pmaXFteWlzeGF2bnNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MDg1OTIsImV4cCI6MjA3NDI4NDU5Mn0.0AaxR_opZSkwz2rRwJ21kmuZ7lrOPglLUIgb8nSnr1k";
 
-    const GLOBAL_SUPABASE_CLIENT_KEY = "__mediSafeSupabaseClient";
+    // ✅ Exact bucket name from your Supabase Storage
+    const PROFILE_IMAGE_BUCKET = "profile-images";  // ✅ Exact bucket name from Supabase Storage
+
+    let supabaseClient = null;
 
     function getSupabaseClient() {
-        if (window[GLOBAL_SUPABASE_CLIENT_KEY]) {
-            return window[GLOBAL_SUPABASE_CLIENT_KEY];
+        if (!supabaseClient) {
+            if (!window.supabase || typeof window.supabase.createClient !== "function") {
+                throw new Error("Supabase client library not loaded.");
+            }
+            supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         }
-
-        if (window.supabase && typeof window.supabase.createClient === "function") {
-            window[GLOBAL_SUPABASE_CLIENT_KEY] = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-            return window[GLOBAL_SUPABASE_CLIENT_KEY];
-        }
-
-        console.error("Supabase library not loaded");
-        return null;
+        return supabaseClient;
     }
-
-    const PROFILE_IMAGE_BUCKET = "profile-images"; // update if your Supabase bucket name is different
-    const DEFAULT_PROFILE_IMAGE = "https://via.placeholder.com/160?text=Profile";
 
     // ================================
     // SESSION HELPERS
@@ -110,7 +106,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // ================================
     function syncProfileImages(imageSrc) {
         if (!imageSrc || imageSrc === "null" || imageSrc === "undefined") {
-            imageSrc = DEFAULT_PROFILE_IMAGE;
+            imageSrc = "default-profile.png";
         }
         if (profileImage)        profileImage.src = imageSrc;
         if (sidebarProfileImage) sidebarProfileImage.src = imageSrc;
@@ -147,7 +143,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (profileNameDisplay) profileNameDisplay.textContent = fullName;
         if (sidebarUserName)    sidebarUserName.textContent    = fullName;
 
-        const img = profileData.image || profileData.profile_image || DEFAULT_PROFILE_IMAGE;
+        const img = profileData.image || profileData.profile_image || "default-profile.png";
         syncProfileImages(img);
     }
 
@@ -198,12 +194,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
         try {
             const client = getSupabaseClient();
-            if (!client) {
-                console.error("🔍 No Supabase client available");
-                return;
-            }
-
-            console.log("🔍 About to query users table for email:", userEmail);
 
             // ✅ Use email as lookup — always set at login, works for all users
             const { data, error } = await client
@@ -211,8 +201,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 .select("id, first_name, last_name, email, phone_number, profile_image")
                 .eq("email", userEmail || "")
                 .single();
-
-            console.log("🔍 Query result - data:", data, "error:", error);
 
             if (error) throw error;
 
@@ -226,7 +214,7 @@ document.addEventListener("DOMContentLoaded", function () {
                     lastName   : data.last_name     || "",
                     email      : data.email         || userEmail || "",
                     contact    : data.phone_number  || "",
-                    image      : data.profile_image || DEFAULT_PROFILE_IMAGE,
+                    image      : data.profile_image || "default-profile.png",
                     lastUpdated: new Date().toISOString()
                 };
 
@@ -238,15 +226,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
                 // ✅ Display the REAL logged-in user's info
                 updateProfileDisplay(normalized);
-                console.log("🔍 Profile loaded and displayed:", normalized);
-            } else {
-                console.warn("profile_page: no user row found for", userEmail);
-                alert("Profile data not found. Please ensure you have signed up and verified your account.");
             }
 
         } catch (err) {
-            console.warn("profile_page: fetch error:", err.message);
-            alert("Error loading profile: " + err.message);
+            console.warn("Supabase load failed, using cache:", err.message);
             const fallback = localStorage.getItem(getProfileKey());
             if (fallback) {
                 try { updateProfileDisplay(JSON.parse(fallback)); } catch (_) {}
@@ -306,7 +289,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         const userId        = getCurrentUserId();
-        const currentImgSrc = profileImage ? profileImage.src : DEFAULT_PROFILE_IMAGE;
+        const currentImgSrc = profileImage ? profileImage.src : "default-profile.png";
 
         const localProfile = {
             firstName  : firstVal,
@@ -327,7 +310,7 @@ document.addEventListener("DOMContentLoaded", function () {
                         last_name   : lastVal,
                         phone_number: contactVal,
                     })
-                    .eq("id", userId);   // use UUID or original id type
+                    .eq("id", Number(userId));   // ✅ integer id
 
                 if (error) throw error;
             }
@@ -429,7 +412,7 @@ document.addEventListener("DOMContentLoaded", function () {
     // REMOVE PROFILE IMAGE
     // ================================
     async function removeProfileImage() {
-        const defaultImage = DEFAULT_PROFILE_IMAGE;
+        const defaultImage = "default-profile.png";
         const userEmail    = getCurrentUserEmail();
 
         try {
@@ -522,7 +505,7 @@ document.addEventListener("DOMContentLoaded", function () {
             imgContainer.style.cssText = "position:relative; max-width:95%; max-height:95%;";
 
             const img = document.createElement("img");
-            img.src   = profileImage ? profileImage.src : DEFAULT_PROFILE_IMAGE;
+            img.src   = profileImage ? profileImage.src : "default-profile.png";
             img.alt   = "Profile Picture";
             img.style.cssText = "width:100%; height:auto; border-radius:8px; box-shadow:0 4px 20px rgba(0,0,0,0.5);";
 
