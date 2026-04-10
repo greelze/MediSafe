@@ -6,197 +6,138 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const TABLE_NAME = "sensors";
 const VISIBLE_POINTS = 10;
 
-let labelCounter = 1;
 let lastRowId = 0;
 
-function isTempCritical(value){
-  return value < 24 || value > 30;
-}
+// Critical Threshold Logic
+const isTempCritical = (v) => v < 24 || v > 30;
+const isHumidCritical = (v) => v > 60;
+const isUVCritical = (v) => v >= 6 && v <= 7;
+const alertColor = "#A4161A";
 
-function isHumidCritical(value){
-  return value > 60;
-}
-
-function isUVCritical(value){
-  return value >= 6 && value <= 7;
-}
-
-const alert = "#A4161A";
-
+// Re-optimized Chart Options (Darker, Larger, No Slant)
 const baseOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  animation: { duration: 0 },
+  animation: false,
   plugins: { legend: { display: false } },
   scales: {
-    x: { ticks: { font: { size: 14 }, color: "#000" }, grid: { display: false } },
-    y: { beginAtZero: true, ticks: { font: { size: 14 }, color: "#000" } }
+    x: { 
+      ticks: { 
+        font: { size: 12, weight: '500' }, 
+        color: "#000",      // Darker font
+        maxRotation: 0, 
+        minRotation: 0,
+        autoSkip: false,    // Show all 10
+        maxTicksLimit: 10,
+        padding: 8
+      }, 
+      grid: { display: false } 
+    },
+    y: { 
+      beginAtZero: true, 
+      ticks: { font: { size: 14 }, color: "#000" } 
+    }
   }
 };
 
-const tempChart = new Chart(document.getElementById("tempChart").getContext("2d"), {
-  type: "line",
-  data: { labels: [], 
-    datasets: [{ 
-      data: [], 
-      borderColor: "red", 
-      backgroundColor: "rgba(255,0,0,0.15)", 
-      tension: 0.3, 
-      pointBackgroundColor: (context) => { //pag na cross yung threshold magiging white siya
-        const value = context.raw;
-        return isTempCritical(value) ? "#F77F00" : "white";
-      },
-      pointBorderColor: (context) => {
-        const value = context.raw;
-        return isTempCritical(value) ? "#F77F00" : "#fff"
-      },
-      pointBorderWidth: 2,
-      pointRadius: 5,
-      segment: { //nag dagdag na rin ako ng dynamic line segment coloring
-        borderColor: (context) => {
-          const value = context.p1.parsed.y;
-          return isTempCritical(value) ? alert : "red";
-        }
-      },
-    }] 
-  },
-  options: baseOptions,
-});
+// Bulletproof Segment Coloring (Prevents crash on single data points)
+const getSegmentColor = (ctx, defaultCol, checkFn) => {
+  if (!ctx.p1 || ctx.p1.parsed === undefined) return defaultCol;
+  return checkFn(ctx.p1.parsed.y) ? alertColor : defaultCol;
+};
 
-const humidityChart = new Chart(document.getElementById("humidityChart").getContext("2d"), {
+// Formats recorded_id into [Date, Time] array for two-line display
+function formatDateTimeLabel(val) {
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return ["--", "--"];
+  const dateStr = d.toLocaleDateString([], { month: '2-digit', day: '2-digit' });
+  const timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  return [dateStr, timeStr];
+}
+
+const tempChart = new Chart(document.getElementById("tempChart"), {
   type: "line",
-  data: { 
-    labels: [], 
-    datasets: [{ 
-      data: [], 
-      borderColor: "blue", 
-      backgroundColor: "rgba(0,0,255,0.15)", 
-      tension: 0.3,
-      pointBackgroundColor: (context) => {
-        const value = context.raw;
-        return isHumidCritical(value) ? "blue" : "blue";
-      },
-      pointBorderColor: (context) => {
-        const value = context.raw;
-        return isHumidCritical(value) ? "blue" : "blue";
-      },
-      pointBorderWidth: 2,
-      pointRadius: 5,
-      segment: {
-        borderColor: (context) => {
-          const value = context.p1.parsed.y;
-          return isHumidCritical(value) ? alert : "blue";
-        }
-      }
-    }] 
-  },
+  data: { labels: [], datasets: [{ 
+    data: [], borderColor: "red", tension: 0.3, pointRadius: 6,
+    pointBackgroundColor: (ctx) => isTempCritical(ctx.raw) ? "#F77F00" : "white",
+    pointBorderColor: (ctx) => isTempCritical(ctx.raw) ? "#A4161A" : "red",
+    pointBorderWidth: 2,
+    segment: { borderColor: (ctx) => getSegmentColor(ctx, "red", isTempCritical) }
+  }]},
   options: baseOptions
 });
 
-const uvChart = new Chart(document.getElementById("uvChart").getContext("2d"), {
+const humidityChart = new Chart(document.getElementById("humidityChart"), {
   type: "line",
-  data: { 
-    labels: [], 
-    datasets: [{ 
-      data: [], 
-      borderColor: "yellow", 
-      backgroundColor: "rgba(219, 231, 43, 0.34)", 
-      tension: 0.3,
-      pointBackgroundColor: (context) => {
-        const value = context.raw;
-        return isUVCritical(value) ? "yellow" : "yellow";
-      },
-      pointBorderColor: (context) => {
-        const value = context.raw;
-        return isUVCritical(value)? "yellow" : "fff";
-      },
-      pointBorderWidth: 2,
-      pointRadius: 5,
-      segment:{
-        borderColor: (context) => {
-          const value = context.p1.parsed.y;
-          return isUVCritical(value) ? alert : "yellow";
-        }
-      }
-    }] 
-  },
+  data: { labels: [], datasets: [{ 
+    data: [], borderColor: "blue", tension: 0.3, pointRadius: 6,
+    pointBackgroundColor: (ctx) => isHumidCritical(ctx.raw) ? "#A4161A" : "white",
+    pointBorderColor: (ctx) => isHumidCritical(ctx.raw) ? "#A4161A" : "blue",
+    pointBorderWidth: 2,
+    segment: { borderColor: (ctx) => getSegmentColor(ctx, "blue", isHumidCritical) }
+  }]},
+  options: baseOptions
+});
+
+const uvChart = new Chart(document.getElementById("uvChart"), {
+  type: "line",
+  data: { labels: [], datasets: [{ 
+    data: [], borderColor: "#EAB308", tension: 0.3, pointRadius: 6,
+    pointBackgroundColor: (ctx) => isUVCritical(ctx.raw) ? "#A4161A" : "white",
+    pointBorderColor: (ctx) => isUVCritical(ctx.raw) ? "#A4161A" : "#EAB308",
+    pointBorderWidth: 2,
+    segment: { borderColor: (ctx) => getSegmentColor(ctx, "#EAB308", isUVCritical) }
+  }]},
   options: baseOptions
 });
 
 function updateMetricCards(row) {
-  const tempCard = document.querySelector(".metric-card.temperature .metric-value");
-  const humidityCard = document.querySelector(".metric-card.humidity .metric-value");
-  const uvCard = document.querySelector(".metric-card.uv .metric-value");
-  const uvRawCard = document.querySelector(".metric-card.uvRaw .metric-value");
-
-  if (tempCard) tempCard.textContent = `${row.temperature}°C`;
-  if (humidityCard) humidityCard.textContent = `${row.humidity}%`;
-  if (uvCard) uvCard.textContent = `${(row.uv_index).toFixed(2)}`;//Current Value card, dito babaguhin if gusto niyo ibahin from uv_index to uv_raw
-  if (uvRawCard) uvRawCard.textContent = `${row.uv_raw}`;
+  const t = document.querySelector(".metric-card.temperature .metric-value");
+  const h = document.querySelector(".metric-card.humidity .metric-value");
+  const u = document.querySelector(".metric-card.uv .metric-value");
+  
+  if (t) t.textContent = `${row.temperature}°C`;
+  if (h) h.textContent = `${row.humidity}%`;
+  if (u) u.textContent = `${Number(row.uv_index).toFixed(2)}`;
 }
 
 function addRow(row) {
-  const label = labelCounter++;
+  const label = formatDateTimeLabel(row.recorded_id);
   
-  tempChart.data.labels.push(label);
-  tempChart.data.datasets[0].data.push(Number(row.temperature));
+  [tempChart, humidityChart, uvChart].forEach((chart, index) => {
+    chart.data.labels.push(label);
+    const val = index === 0 ? row.temperature : (index === 1 ? row.humidity : row.uv_index);
+    chart.data.datasets[0].data.push(Number(val));
 
-  humidityChart.data.labels.push(label);
-  humidityChart.data.datasets[0].data.push(Number(row.humidity));
-
-  uvChart.data.labels.push(label);
-  uvChart.data.datasets[0].data.push(Number(row.uv_index)); //baguhin to doon sa column name sa Supabase
-
-  while (tempChart.data.labels.length > VISIBLE_POINTS) {
-    tempChart.data.labels.shift();
-    tempChart.data.datasets[0].data.shift();
-    humidityChart.data.labels.shift();
-    humidityChart.data.datasets[0].data.shift();
-    uvChart.data.labels.shift();
-    uvChart.data.datasets[0].data.shift();
-  }
-
-  tempChart.update();
-  humidityChart.update();
-  uvChart.update();
+    if (chart.data.labels.length > VISIBLE_POINTS) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+    }
+    chart.update();
+  });
 
   updateMetricCards(row);
-
   lastRowId = row.id;
 }
 
 async function loadInitialData() {
-  try {
-    const { data, error } = await supabase
-      .from(TABLE_NAME)
-      .select("id, temperature, humidity, uv_index, uv_raw")//pati rin dito para gumana ng maayos para sa metric card
-      .order("id", { ascending: false })
-      .limit(VISIBLE_POINTS);
+  const { data, error } = await supabase
+    .from(TABLE_NAME)
+    .select("id, recorded_id, temperature, humidity, uv_index")
+    .order("id", { ascending: false })
+    .limit(VISIBLE_POINTS);
 
-    if (error) throw error;
-    if (!data || data.length === 0) return;
-
-    const rows = data.reverse();
-    rows.forEach(addRow);
-
-    lastRowId = rows[rows.length - 1].id;
-  } catch (err) {
-    console.error("Error loading initial data:", err);
+  if (!error && data) {
+    data.reverse().forEach(addRow);
   }
 }
 
 function subscribeRealtime() {
-  supabase
-    .channel("sensors-realtime")
-    .on(
-      "postgres_changes",
-      { event: "INSERT", schema: "public", table: TABLE_NAME },
-      payload => {
-        const newRow = payload.new;
-        if (newRow.id > lastRowId) addRow(newRow);
-      }
-    )
-    .subscribe();
+  supabase.channel("sensors-realtime")
+    .on("postgres_changes", { event: "INSERT", schema: "public", table: TABLE_NAME }, 
+    payload => {
+      if (payload.new.id > lastRowId) addRow(payload.new);
+    }).subscribe();
 }
 
 // --- AI PREDICTION LOGIC ---
@@ -212,17 +153,13 @@ async function fetchLatestPrediction() {
     if (!data || data.length === 0) return;
 
     const pred = data[0];
-
-    // Update DOM Elements with the fetched numbers
     document.getElementById('ai-temp').textContent = `${pred.predicted_temp}°C`;
     document.getElementById('ai-hum').textContent = `${pred.predicted_hum}%`;
     document.getElementById('ai-uv').textContent = `${pred.predicted_uv}`;
 
-    // Update Trends & Apply the correct CSS color class
     updateTrendLabel('ai-temp-trend', pred.temp_trend);
     updateTrendLabel('ai-hum-trend', pred.hum_trend);
     updateTrendLabel('ai-uv-trend', pred.uv_trend);
-
   } catch (err) {
     console.error("Error fetching AI prediction:", err);
   }
@@ -231,41 +168,23 @@ async function fetchLatestPrediction() {
 function updateTrendLabel(elementId, trendText) {
   const el = document.getElementById(elementId);
   if (!el) return;
-  
   el.textContent = trendText;
-  
-  // Clear old color classes
   el.classList.remove('trend-rising', 'trend-falling', 'trend-stable');
-  
-  // Apply new color class based on the text from Python
-  if (trendText.includes("RISING")) {
-    el.classList.add('trend-rising');
-  } else if (trendText.includes("FALLING")) {
-    el.classList.add('trend-falling');
-  } else {
-    el.classList.add('trend-stable');
-  }
+  if (trendText.includes("RISING")) el.classList.add('trend-rising');
+  else if (trendText.includes("FALLING")) el.classList.add('trend-falling');
+  else el.classList.add('trend-stable');
 }
 
 async function initDashboard() {
   await loadInitialData();
   subscribeRealtime();
-  
-  // Fetch AI Prediction immediately on load
   await fetchLatestPrediction();
-  
-  // Refresh the AI Prediction every 15 seconds to match the Python script
-  setInterval(fetchLatestPrediction, 15000); 
+  setInterval(fetchLatestPrediction, 15000);
 }
 
 initDashboard();
 
-// Expose logout helper for the inline script in dashboard_page.html
 window.mediaSafeLogout = async function() {
-    try {
-        await supabase.auth.signOut();
-    } catch (err) {
-        console.error('Logout error:', err);
-    }
-    window.location.href = 'login_page.html';
+  try { await supabase.auth.signOut(); } catch (err) { console.error('Logout error:', err); }
+  window.location.href = 'login_page.html';
 };
