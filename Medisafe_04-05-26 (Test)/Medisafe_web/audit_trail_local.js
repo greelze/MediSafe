@@ -5,7 +5,7 @@ let supabaseStatusData = [];
 let combinedData       = [];
 let filteredData       = [];
 let currentPage        = 1;
-const PER_PAGE         = 10;
+const PER_PAGE         = 7;
 
 // Thresholds (must match Flutter app)
 const TEMP_MIN  = 25.0, TEMP_MAX  = 30.0;
