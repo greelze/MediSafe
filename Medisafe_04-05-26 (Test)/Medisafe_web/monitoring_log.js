@@ -5,108 +5,113 @@ const TABLE_NAME = 'status_logs';
 const { createClient } = supabase;
 const monitoringClient = createClient(MONITORING_SUPABASE_URL, MONITORING_SUPABASE_KEY);
 
-function formatDateToLocal(dateString) {
-    if (!dateString) return '—';
-    const dt = new Date(dateString);
-    return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-}
+let allLogs = [];
+let userMap = {};
+let currentPage = 1;
+const PER_PAGE = 10;
 
-function formatTimeToLocal(dateString) {
-    if (!dateString) return '—';
-    const dt = new Date(dateString);
-    return dt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-
-function showToast(message, type = 'success') {
-    const toast = document.getElementById('toast');
-    toast.textContent = message;
-    toast.style.backgroundColor = type === 'error' ? 'rgba(220,38,38,0.85)' : 'rgba(16,185,129,0.9)';
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2600);
-}
-
-async function loadMonitoringStatusLogs() {
-    const tbody = document.getElementById('monitoring-table-body');
-    const emptyState = document.getElementById('empty-state');
-    const countSpan = document.getElementById('record-count');
-
-    // Remove the visual 'Loading...' text to make real-time updates seamless
-    if (tbody.innerHTML === '') countSpan.textContent = 'Loading...'; 
-
+async function loadInitialData() {
     try {
-        const { data: logs, error: logsError } = await monitoringClient
+        // 1. Fetch Users first for the lookup
+        const { data: users } = await monitoringClient.from('users').select('id, first_name, last_name');
+        if (users) {
+            users.forEach(u => userMap[u.id] = `${u.first_name} ${u.last_name}`);
+        }
+
+        // 2. Fetch Logs
+        const { data: logs, error } = await monitoringClient
             .from(TABLE_NAME)
-            .select('id, logged_at, temperature, humidity, uv_index, notes, logged_by')
+            .select('*')
             .order('logged_at', { ascending: false });
 
-        if (logsError) {
-            console.error('Supabase fetch error:', logsError);
-            showToast(`Failed to load status logs: ${logsError.message}`, 'error');
-            countSpan.textContent = 'Error';
-            return;
-        }
+        if (error) throw error;
 
-        if (!logs || logs.length === 0) {
-            tbody.innerHTML = '';
-            emptyState.style.display = 'block';
-            countSpan.textContent = '0 entries';
-            return;
-        }
-
-        emptyState.style.display = 'none';
-
-        const { data: users, error: usersError } = await monitoringClient
-            .from('users')
-            .select('id, first_name, last_name');
-
-        const userMap = {};
-        if (!usersError && users) {
-            users.forEach(u => {
-                userMap[u.id] = `${u.first_name} ${u.last_name}`;
-            });
-        }
-
-        tbody.innerHTML = ''; // Clear table right before appending new data
-
-        logs.forEach(row => {
-            const user = userMap[row.logged_by] || 'Unknown';
-            const tr = document.createElement('tr');
-            tr.innerHTML = `
-                <td>${user}</td>
-                <td>${formatDateToLocal(row.logged_at)}</td>
-                <td>${formatTimeToLocal(row.logged_at)}</td>
-                <td>${(row.temperature !== null && row.temperature !== undefined) ? `${row.temperature.toFixed(1)} °C` : '—'}</td>
-                <td>${(row.humidity !== null && row.humidity !== undefined) ? `${row.humidity.toFixed(1)} %` : '—'}</td>
-                <td>${(row.uv_index !== null && row.uv_index !== undefined) ? row.uv_index.toFixed(0) : '—'}</td>
-                <td>${row.notes ? row.notes : '—'}</td>
-            `;
-            tbody.appendChild(tr);
-        });
-
-        countSpan.textContent = `${logs.length} entr${logs.length === 1 ? 'y' : 'ies'}`;
+        allLogs = logs || [];
+        renderTable();
     } catch (err) {
-        console.error('Unexpected error loading logs:', err);
-        showToast('Error loading monitoring logs.', 'error');
-        countSpan.textContent = 'Error';
+        console.error("Error loading data:", err);
     }
 }
 
-function subscribeRealtime() {
-    monitoringClient
-        .channel('status-logs-channel')
-        .on(
-            'postgres_changes',
-            { event: 'INSERT', schema: 'public', table: TABLE_NAME },
-            (payload) => {
-                // When a new log is inserted into Supabase, reload the table and show a toast
-                showToast('New monitoring log received!');
-                loadMonitoringStatusLogs();
-            }
-        )
-        .subscribe();
+function renderTable() {
+    const tbody = document.getElementById('monitoring-table-body');
+    const countSpan = document.getElementById('record-count');
+    const emptyState = document.getElementById('empty-state');
+    const paginationContainer = document.getElementById('pagination');
+    
+    tbody.innerHTML = '';
+
+    if (!allLogs || allLogs.length === 0) {
+        emptyState.style.display = 'block';
+        countSpan.textContent = '0 entries';
+        paginationContainer.innerHTML = '';
+        return;
+    }
+
+    emptyState.style.display = 'none';
+    countSpan.textContent = `${allLogs.length} total entries`;
+
+    // Pagination Calculation
+    const start = (currentPage - 1) * PER_PAGE;
+    const end = start + PER_PAGE;
+    const paginatedItems = allLogs.slice(start, end);
+
+    paginatedItems.forEach(row => {
+        const userName = userMap[row.logged_by] || 'Unknown User';
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><div class="user-badge">${userName}</div></td>
+            <td>${new Date(row.logged_at).toLocaleDateString()}</td>
+            <td>${new Date(row.logged_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td>
+            <td><span class="value-tag temp">${row.temperature?.toFixed(1) || '—'} °C</span></td>
+            <td><span class="value-tag humid">${row.humidity?.toFixed(1) || '—'} %</span></td>
+            <td><span class="value-tag uv">${row.uv_index?.toFixed(0) || '—'}</span></td>
+            <td>${row.notes || '—'}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    renderPaginationControls();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    loadMonitoringStatusLogs();
-    subscribeRealtime();
-});
+function renderPaginationControls() {
+    const container = document.getElementById('pagination');
+    const totalPages = Math.ceil(allLogs.length / PER_PAGE);
+    container.innerHTML = '';
+
+    if (totalPages <= 1) return;
+
+    // Previous Button
+    const prev = document.createElement('button');
+    prev.className = 'page-btn';
+    prev.innerHTML = '←';
+    prev.disabled = currentPage === 1;
+    prev.onclick = () => { currentPage--; renderTable(); };
+    container.appendChild(prev);
+
+    // Page Buttons
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+            const btn = document.createElement('button');
+            btn.className = `page-btn ${i === currentPage ? 'active' : ''}`;
+            btn.textContent = i;
+            btn.onclick = () => { currentPage = i; renderTable(); };
+            container.appendChild(btn);
+        } else if (Math.abs(i - currentPage) === 2) {
+            const dots = document.createElement('span');
+            dots.textContent = '...';
+            dots.style.padding = '0 8px';
+            container.appendChild(dots);
+        }
+    }
+
+    // Next Button
+    const next = document.createElement('button');
+    next.className = 'page-btn';
+    next.innerHTML = '→';
+    next.disabled = currentPage === totalPages;
+    next.onclick = () => { currentPage++; renderTable(); };
+    container.appendChild(next);
+}
+
+document.addEventListener('DOMContentLoaded', loadInitialData);
