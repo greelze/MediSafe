@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Users — MediSafe</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="users_page.css">
+</head>
+<body>
+  <div class="app-container">
+
+    <!-- ─── Sidebar ─── -->
+    <div class="sidebar">
+      <div class="logo-section">
+        <div class="logo">🏥</div>
+        <div class="brand-name">MediSafe</div>
+      </div>
+      <div class="nav-section">
+        <a href="dashboard_page.html" class="nav-item">
+          <span class="nav-icon">🏠</span><span class="nav-text">Home</span>
+        </a>
+        <a href="history_page.html" class="nav-item">
+          <span class="nav-icon">🕒</span><span class="nav-text">Threshold History</span>
+        </a>
+        <a href="analytics_page.html" class="nav-item">
+          <span class="nav-icon">📊</span><span class="nav-text">Analytics</span>
+        </a>
+        <a href="sensors_location.html" class="nav-item">
+          <span class="nav-icon">📍</span><span class="nav-text">Sensor Locations</span>
+        </a>
+        <a href="audit_trail_local.html" class="nav-item">
+          <span class="nav-icon">📋</span><span class="nav-text">Audit Trail</span>
+        </a>
+        <a href="monitoring_log.html" class="nav-item">
+          <span class="nav-icon">🩺</span><span class="nav-text">Monitoring Log</span>
+        </a>
+        <a href="users_page.html" class="nav-item active">
+          <span class="nav-icon">👥</span><span class="nav-text">Users</span>
+        </a>
+        <a href="settings_page.html" class="nav-item">
+          <span class="nav-icon">⚙️</span><span class="nav-text">Settings</span>
+        </a>
+      </div>
+      <div class="profile-section">
+        <a href="profile_page.html" class="profile-link">
+          <div class="avatar-placeholder"></div>
+        </a>
+        <a href="login_page.html" class="nav-item logout-item">
+          <span class="nav-icon">🚪</span><span class="nav-text">Logout</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- ─── Main Content ─── -->
+    <div class="main-content">
+      <div class="header">
+        <span id="page-title">Users</span>
+        <div class="header-actions">
+          <button class="export-btn" id="exportUsersBtn">
+            <span>📥</span><span>Export CSV</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="content-body">
+
+        <!-- Stat Cards -->
+        <div class="users-stats-grid">
+          <div class="stat-card users">
+            <div class="stat-icon">👥</div>
+            <div class="stat-content">
+              <div class="stat-value" id="stat-total">—</div>
+              <div class="stat-label">Total Users</div>
+            </div>
+          </div>
+          <div class="stat-card approved-card">
+            <div class="stat-icon approved-icon">✅</div>
+            <div class="stat-content">
+              <div class="stat-value" id="stat-approved">—</div>
+              <div class="stat-label">Approved Users</div>
+            </div>
+          </div>
+          <div class="stat-card pending-card">
+            <div class="stat-icon pending-icon">⏳</div>
+            <div class="stat-content">
+              <div class="stat-value" id="stat-pending">—</div>
+              <div class="stat-label">Pending Approval</div>
+            </div>
+          </div>
+          <div class="stat-card recent-card">
+            <div class="stat-icon recent-icon">📅</div>
+            <div class="stat-content">
+              <div class="stat-value" id="stat-recent">—</div>
+              <div class="stat-label">Joined This Week</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="users-tabs">
+          <button class="users-tab active" data-tab="all">All Users</button>
+          <button class="users-tab" data-tab="pending">
+            Pending Approval
+            <span class="tab-badge" id="badge-pending">0</span>
+          </button>
+          <button class="users-tab" data-tab="approved">
+            Approved
+            <span class="tab-badge green" id="badge-approved">0</span>
+          </button>
+        </div>
+
+        <!-- Toolbar -->
+        <div class="users-toolbar">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="searchInput" placeholder="Search by name, email or ID…" />
+          </div>
+          <button class="refresh-btn" id="refreshBtn">
+            <span class="spin-icon">🔄</span><span>Refresh</span>
+          </button>
+        </div>
+
+        <!-- Users Table -->
+        <div class="users-card">
+          <div class="users-card-header">
+            <h2 class="users-card-title">
+              <span class="live-dot"></span>
+              <span id="tableTitle">All Users</span>
+            </h2>
+            <span class="record-count" id="recordCount">Loading…</span>
+          </div>
+
+          <div class="users-table-wrap">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th>User ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Joined / Approved Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination-wrap" id="paginationWrap" style="display:none;">
+            <span class="pagination-info" id="paginationInfo"></span>
+            <div class="pagination-controls" id="paginationControls"></div>
+          </div>
+        </div>
+
+      </div><!-- end content-body -->
+    </div><!-- end main-content -->
+  </div><!-- end app-container -->
+
+  <!-- Toast -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Confirm Modal -->
+  <div class="confirm-modal-overlay" id="confirmOverlay">
+    <div class="confirm-modal">
+      <div class="confirm-modal-icon" id="confirmIcon">⚠️</div>
+      <h3 class="confirm-modal-title" id="confirmTitle">Confirm</h3>
+      <p class="confirm-modal-msg" id="confirmMsg">Are you sure?</p>
+      <div class="confirm-modal-actions">
+        <button class="btn-secondary" id="confirmCancel">Cancel</button>
+        <button class="btn-danger" id="confirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Notification Preview Modal -->
+  <div class="notif-modal-overlay" id="notifOverlay">
+    <div class="notif-modal">
+      <div class="notif-modal-header">
+        <h3 class="notif-modal-title">📬 Approval Notification</h3>
+        <button class="notif-close" id="notifClose">×</button>
+      </div>
+      <p class="notif-subtitle">The following notification will be sent to the user:</p>
+      <div class="notif-preview" id="notifPreview"></div>
+      <div class="notif-note">
+        📧 This email will be sent via Resend to the user's registered email address once you confirm.
+      </div>
+      <div class="notif-actions">
+        <button class="btn-secondary" id="notifCancel">Cancel</button>
+        <button class="btn-primary" id="notifConfirm">✓ Approve &amp; Notify</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+  <script src="users_page.js"></script>
+</body>
+</html>
