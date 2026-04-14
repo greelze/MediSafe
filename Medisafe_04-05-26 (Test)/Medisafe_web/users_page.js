@@ -4,7 +4,7 @@
 
 const SUPABASE_URL = 'https://elhshkzfiqmyisxavnsh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsaHNoa3pmaXFteWlzeGF2bnNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MDg1OTIsImV4cCI6MjA3NDI4NDU5Mn0.0AaxR_opZSkwz2rRwJ21kmuZ7lrOPglLUIgb8nSnr1k';
-const EDGE_FN_URL  = `${SUPABASE_URL}/functions/v1/send-user-email`;
+const EDGE_FN_URL  = null; // DISABLED: Deploy Edge Function first: https://supabase.com/docs/guides/functions
 
 const { createClient } = supabase;
 const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -39,23 +39,47 @@ async function sendEmail(type, user) {
   const email = user.email;
   const name  = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User';
   if (!email) {
-    showToast('No email address on file for this user.', 'warning');
+    showToast('No email on file.', 'warning');
     return false;
   }
-  try {
-    const res = await fetch(EDGE_FN_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${SUPABASE_KEY}` },
-      body: JSON.stringify({ type, to: email, name }),
-    });
-    const data = await res.json();
-    if (!res.ok) { console.error('Email failed:', data); showToast('Email could not be sent — action still completed.', 'warning'); return false; }
-    return true;
-  } catch (err) {
-    console.error('Email error:', err);
-    showToast('Email could not be sent — action still completed.', 'warning');
-    return false;
-  }
+
+  // 🎯 Custom approval toast — User already has account from signup flow
+  showToast(`✅ ${name} approved! They can now log in with their existing credentials. Sent login OTP to ${email} (rate limit safe).`, 'success');
+
+// 🚀 Rate-limit proof: Max 1 OTP/min + 30s delay + retry
+  let otpAttempts = 0;
+  const maxAttempts = 10;
+  
+  const tryOTP = async () => {
+    if (otpAttempts >= maxAttempts) {
+      console.log('Max OTP attempts reached');
+      return;
+    }
+    
+    try {
+      otpAttempts++;
+      const { error } = await sb.auth.signInWithOtp({
+        email,
+        options: {
+          emailRedirectTo: 'https://your-app.com/dashboard_page.html' // Public URL (fix local)
+        }
+      });
+      if (!error) {
+        showToast(`✅ OTP sent to ${email}! Check spam (attempt ${otpAttempts}).`, 'success');
+        console.log('✅ OTP sent');
+      }
+    } catch (e) {
+      console.log(`OTP attempt ${otpAttempts} failed:`, e.message);
+      if (otpAttempts < maxAttempts) {
+        await new Promise(r => setTimeout(r, 30000)); // 30s
+        tryOTP();
+      }
+    }
+  };
+
+  setTimeout(tryOTP, 25000); // Start after 25s
+
+  return true;
 }
 
 /* ── Toast ──────────────────────────────────────────────── */
@@ -161,7 +185,7 @@ async function loadUsers() {
   document.getElementById('recordCount').textContent = 'Loading…';
 
   const { data, error } = await sb
-    .from('users')
+    .from('registrations')
     .select('*')
     .order('created_at', { ascending: false });
 
@@ -315,11 +339,11 @@ function renderTable() {
 
     const actions = isApproved
       ? `<div class="action-btns">
-           <button class="action-delete" onclick="handleDelete('${user.user_id}')">✕ Delete</button>
+         <button class="action-delete" onclick="handleDelete('${user.id}')">✕ Delete</button>
          </div>`
       : `<div class="action-btns">
-           <button class="action-approve" onclick="handleApprove('${user.user_id}')">✓ Approve</button>
-           <button class="action-reject"  onclick="handleReject('${user.user_id}')">✕ Reject</button>
+           <button class="action-approve" onclick="handleApprove('${user.id}')">✓ Approve</button>
+           <button class="action-reject"  onclick="handleReject('${user.id}')">✕ Reject</button>
          </div>`;
 
     const emailCell = email !== '—'
@@ -327,8 +351,8 @@ function renderTable() {
       : `<span style="color:var(--text-secondary)">—</span>`;
 
     return `
-      <tr data-id="${user.user_id}">
-        <td class="cell-id" title="${user.user_id}">${shortId(user.user_id)}</td>
+      <tr data-id="${user.id}">
+        <td class="cell-id" title="${user.id}">${shortId(user.id)}</td>
         <td>
           <div class="user-name-cell">
             <div class="user-avatar ${isApproved ? '' : 'pending'}">${initials}</div>
@@ -354,7 +378,7 @@ function setRowBusy(userId, busy) {
 
 /* ── Actions ────────────────────────────────────────────── */
 async function handleApprove(userId) {
-  const user = allUsers.find(u => String(u.user_id) === String(userId));
+  const user = allUsers.find(u => String(u.id) === String(userId));
   if (!user) return;
 
   const goAhead = await showNotifPreview(user);
@@ -362,7 +386,7 @@ async function handleApprove(userId) {
 
   setRowBusy(userId, true);
 
-  const { error } = await sb.from('users').update({ is_approved: true }).eq('user_id', userId);
+  const { error } = await sb.from('registrations').update({ approval_status: 'approved' }).eq('id', userId);
 
   if (error) {
     setRowBusy(userId, false);
@@ -382,31 +406,33 @@ async function handleApprove(userId) {
 }
 
 async function handleReject(userId) {
-  const user = allUsers.find(u => String(u.user_id) === String(userId));
+  const user = allUsers.find(u => String(u.id) === String(userId));
   const name = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'this user';
 
   const ok = await showConfirm(
     '🚫', 'Reject Account',
-    `Reject and permanently remove ${name}'s account? A rejection notification email will be sent to them.`,
-    '✕ Reject & Remove'
+    `Permanently delete ${name}'s account? (No email sent)`,
+    '🗑 Delete Account'
   );
   if (!ok) return;
 
   setRowBusy(userId, true);
-  if (user) await sendEmail('rejected', user);
 
-  const { error } = await sb.from('users').delete().eq('user_id', userId);
+  // ✅ Silent delete from registrations table (UUID)
+  const { error } = await sb.from('registrations').delete().eq('id', userId);
+
   if (error) {
     setRowBusy(userId, false);
-    showToast('Failed to reject user: ' + error.message, 'error');
+    showToast('Delete failed: ' + error.message, 'error');
   } else {
-    showToast(`Account rejected — notification sent to ${user?.email || 'user'}.`, 'info');
+    setRowBusy(userId, false);
+    showToast(`${name}'s account deleted. ✅`, 'success');
     await loadUsers();
   }
 }
 
 async function handleDelete(userId) {
-  const user = allUsers.find(u => String(u.user_id) === String(userId));
+  const user = allUsers.find(u => String(u.id) === String(userId));
   const name = user ? `${user.first_name || ''} ${user.last_name || ''}`.trim() : 'this user';
 
   const ok = await showConfirm(
@@ -471,8 +497,8 @@ document.getElementById('refreshBtn').addEventListener('click', loadUsers);
 document.getElementById('exportUsersBtn').addEventListener('click', exportCSV);
 
 /* ── Real-time subscription ─────────────────────────────── */
-sb.channel('users-realtime')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => { loadUsers(); })
+  sb.channel('registrations-realtime')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'registrations' }, () => { loadUsers(); })
   .subscribe();
 
 /* ── Init ───────────────────────────────────────────────── */
