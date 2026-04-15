@@ -667,46 +667,8 @@
 
 
 
-/* Delete / Remove Button — Sensor Location */
-#remove,
-.delete-btn {
+#remove {
     margin-left: 8px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: transparent;
-    color: #dc2626;
-    border: 1.5px solid #dc2626;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    letter-spacing: 0.3px;
-    transition: background 0.18s ease, color 0.18s ease,
-                box-shadow 0.18s ease, transform 0.15s ease;
-}
-
-#remove::before {
-    content: "✕";
-    font-size: 11px;
-    font-weight: 700;
-    line-height: 1;
-}
-
-#remove:hover,
-.delete-btn:hover {
-    background: #dc2626;
-    color: #ffffff;
-    box-shadow: 0 4px 14px rgba(220, 38, 38, 0.35);
-    transform: translateY(-1px);
-}
-
-#remove:active,
-.delete-btn:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
 }
 
 /* Modal Background Overlay */
@@ -766,35 +728,7 @@
 
 .warning-text { color: #dc2626; font-size: 0.85rem; margin-top: 5px; }
 
-.btn-danger {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-    color: white;
-    border: none;
-    padding: 10px 20px;
-    border-radius: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-    letter-spacing: 0.2px;
-    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
-    transition: box-shadow 0.18s ease, transform 0.15s ease, filter 0.18s ease;
-}
-
-.btn-danger:hover {
-    box-shadow: 0 6px 18px rgba(220, 38, 38, 0.45);
-    transform: translateY(-1px);
-    filter: brightness(1.08);
-}
-
-.btn-danger:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
-    filter: brightness(0.96);
-}
+.btn-danger { background: #dc2626; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
 .btn-secondary { background: #e5e7eb; color: #374151; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; margin-right: 10px; }
 
 /* This ensures the delete modal is centered and independent */
