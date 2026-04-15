@@ -214,8 +214,8 @@ async function loadUsers() {
 /* ── Stats ──────────────────────────────────────────────── */
 function updateStats() {
   const total    = allUsers.length;
-  const approved = allUsers.filter(u => u.is_approved).length;
-  const pending  = allUsers.filter(u => !u.is_approved).length;
+  const approved = allUsers.filter(u => u.approval_status === 'approved').length;
+  const pending  = allUsers.filter(u => u.approval_status !== 'approved').length;
   const weekAgo  = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
   const recent   = allUsers.filter(u => u.created_at && new Date(u.created_at) >= weekAgo).length;
 
@@ -230,8 +230,8 @@ function updateStats() {
 /* ── Filter + search ────────────────────────────────────── */
 function getVisibleUsers() {
   let users = allUsers;
-  if (activeTab === 'pending')  users = users.filter(u => !u.is_approved);
-  if (activeTab === 'approved') users = users.filter(u =>  u.is_approved);
+  if (activeTab === 'pending')  users = users.filter(u => u.approval_status !== 'approved');
+  if (activeTab === 'approved') users = users.filter(u => u.approval_status === 'approved');
   if (searchQuery.trim()) {
     const q = searchQuery.toLowerCase();
     users = users.filter(u => {
@@ -330,7 +330,7 @@ function renderTable() {
   tbody.innerHTML = pageUsers.map(user => {
     const name       = `${user.first_name || ''} ${user.last_name || ''}`.trim() || '—';
     const initials   = getInitials(user.first_name, user.last_name);
-    const isApproved = !!user.is_approved;
+    const isApproved = user.approval_status === 'approved';
     const email      = user.email || '—';
 
     const badge = isApproved
@@ -352,7 +352,7 @@ function renderTable() {
 
     return `
       <tr data-id="${user.id}">
-        <td class="cell-id" title="${user.id}">${shortId(user.id)}</td>
+
         <td>
           <div class="user-name-cell">
             <div class="user-avatar ${isApproved ? '' : 'pending'}">${initials}</div>
@@ -443,7 +443,7 @@ async function handleDelete(userId) {
   if (!ok) return;
 
   setRowBusy(userId, true);
-  const { error } = await sb.from('users').delete().eq('user_id', userId);
+  const { error } = await sb.from('registrations').delete().eq('id', userId);
   if (error) {
     setRowBusy(userId, false);
     showToast('Failed to delete user: ' + error.message, 'error');
@@ -463,7 +463,7 @@ function exportCSV() {
       u.first_name || '',
       u.last_name  || '',
       u.email      || '',
-      u.is_approved ? 'Approved' : 'Pending',
+      (u.approval_status === 'approved' ? 'Approved' : 'Pending'),
       formatDate(u.created_at)
     ])
   ];
