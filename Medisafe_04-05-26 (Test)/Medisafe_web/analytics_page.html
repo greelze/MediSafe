@@ -1,649 +1,1266 @@
-<!doctype html>
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const SUPABASE_URL = "https://elhshkzfiqmyisxavnsh.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsaHNoa3pmaXFteWlzeGF2bnNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3MDg1OTIsImV4cCI6MjA3NDI4NDU5Mn0.0AaxR_opZSkwz2rRwJ21kmuZ7lrOPglLUIgb8nSnr1k";
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+window.supabase = supabase; // expose for onclick handlers
+const TABLE_NAME = "sensors";
+
+const THRESHOLDS = {
+  temperature: 30, 
+  humidity: 60,    
+  light: 7      // UV index threshold
+};
+
+let analyticsData = [];
+let filteredData = [];
+let analyticsChart = null;
+let currentFilter = "all";
+
+function getRowTimestamp(row) {
+  const candidates = [
+    row.recorded_id,
+    row.recorded_at,
+    row.created_at,
+    row.inserted_at,
+    row.timestamp
+  ];
+
+  for (const value of candidates) {
+    if (value === null || value === undefined || value === "") continue;
+    const date = new Date(value);
+    if (!isNaN(date)) return date;
+  }
+  return null;
+}
+
+function getSensorValue(row, keys) {
+  for (const key of keys) {
+    if (row[key] !== null && row[key] !== undefined && row[key] !== '') {
+      const n = Number(row[key]);
+      if (!Number.isNaN(n)) return n;
+    }
+  }
+  return null;
+}
+
+function getTemperature(row) {
+  return getSensorValue(row, ['temperature', 'temp']);
+}
+
+function getHumidity(row) {
+  return getSensorValue(row, ['humidity', 'hum']);
+}
+
+function getUV(row) {
+  return getSensorValue(row, ['uv_index', 'uv', 'light']);
+}
+
+function getStatus(value, threshold) {
+  if (value === null || value === undefined || value === "") return '-';
+  return Number(value) > threshold ? 'Alert' : 'Normal';
+}
+
+function getStatusClass(status) {
+  if (status === 'Alert') return 'alert';
+  if (status === 'Normal') return 'normal';
+  return 'normal';
+}
+
+function createStatusSpan(alert) {
+  const status = alert ? 'Alert' : 'Normal';
+  const className = alert ? 'alert' : 'normal';
+  return `<span class="${className}">${status}</span>`;
+}
+
+function createTableRow(row) {
+  const timestamp = getRowTimestamp(row);
+  const date = timestamp ? timestamp.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+
+  const tempNum = getTemperature(row);
+  const humNum = getHumidity(row);
+  const uvNum = getUV(row);
+
+  const tempAlert = tempNum !== null && tempNum > THRESHOLDS.temperature;
+  const humAlert = humNum !== null && humNum > THRESHOLDS.humidity;
+  const uvAlert = uvNum !== null && uvNum > THRESHOLDS.light;
+
+  const tempValue = tempNum === null ? '-' : `${tempNum.toFixed(1)}°C`;
+  const tempStatus = tempNum === null ? '-' : createStatusSpan(tempAlert);
+  const humValue = humNum === null ? '-' : `${humNum.toFixed(1)}%`;
+  const humStatus = humNum === null ? '-' : createStatusSpan(humAlert);
+  const uvValue = uvNum === null ? '-' : `${uvNum.toFixed(2)} UVI`;
+  const uvStatus = uvNum === null ? '-' : createStatusSpan(uvAlert);
+
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${date}</td>
+    <td>${tempValue}</td>
+    <td>${tempStatus}</td>
+    <td>${humValue}</td>
+    <td>${humStatus}</td>
+    <td>${uvValue}</td>
+    <td>${uvStatus}</td>
+  `;
+
+  return tr;
+}
+
+function initializeChart() {
+  const canvas = document.getElementById("analyticsChart");
+  if (!canvas) {
+    console.error("Canvas element not found!");
+    return;
+  }
+  
+  analyticsChart = new Chart(canvas.getContext("2d"), {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [
+         { 
+           label: "Temperature (°C)", 
+           data: [], 
+           borderColor: "#FF0531", 
+           backgroundColor: "rgba(255, 5, 49, 0.1)", 
+           tension: 0.4, 
+           fill: true, 
+           borderWidth: 3,
+           pointBackgroundColor: "#FF0531",
+           pointBorderColor: "#fff",
+           pointBorderWidth: 2,
+           pointRadius: 4,
+           pointHoverRadius: 6
+         },
+         { 
+           label: "Humidity (%)", 
+           data: [], 
+           borderColor: "#3b82f6", 
+           backgroundColor: "rgba(59, 130, 246, 0.1)", 
+           tension: 0.4, 
+           fill: true, 
+           borderWidth: 3,
+           pointBackgroundColor: "#3b82f6",
+           pointBorderColor: "#fff",
+           pointBorderWidth: 2,
+           pointRadius: 4,
+           pointHoverRadius: 6
+         },
+         { 
+           label: "UV Index", 
+           data: [], 
+           borderColor: "#f59e0b", 
+           backgroundColor: "rgba(245, 158, 11, 0.1)", 
+           tension: 0.4, 
+           fill: true, 
+           borderWidth: 3,
+           pointBackgroundColor: "#f59e0b",
+           pointBorderColor: "#fff",
+           pointBorderWidth: 2,
+           pointRadius: 4,
+           pointHoverRadius: 6
+         }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { 
+        legend: { 
+          display: true, 
+          position: "top",
+          labels: {
+            padding: 20,
+            font: {
+              size: 13,
+              weight: 600
+            },
+            usePointStyle: true,
+            pointStyle: 'circle'
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          padding: 12,
+          titleFont: {
+            size: 14,
+            weight: 600
+          },
+          bodyFont: {
+            size: 13
+          },
+          borderColor: '#e5e7eb',
+          borderWidth: 1
+        }
+      },
+scales: { 
+        x: { 
+          title: {
+            display: true,
+            text: 'Gathered Reading per seconds',
+            font: { size: 14, weight: 'bold' }
+          },
+          grid: { 
+            display: false 
+          },
+          ticks: {
+            font: {
+              size: 12
+            }
+          }
+        }, 
+        y: { 
+          title: {
+            display: true,
+            text: 'Threadhold Values',
+            font: { size: 14, weight: 'bold' }
+          },
+          grid: { 
+            color: "#f3f4f6" 
+          },
+          ticks: {
+            font: {
+              size: 12
+            }
+          },
+          beginAtZero: true
+        } 
+      }
+    }
+  });
+}
+
+async function loadAnalyticsData() {
+  try {
+    // Always load ALL sensor data regardless of active location
+    // Stats, charts, and reports show totals across ALL locations
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .select("*");
+
+    if (error) throw error;
+
+    analyticsData = (data || []).slice();
+    console.log("Loaded analytics data:", analyticsData.length, analyticsData);
+
+    if (analyticsData.length === 0) {
+      console.warn("No analytics data found; using sample fallback data.");
+      analyticsData = [
+        { temperature: 26.2, humidity: 54.1, uv_index: 4.1, user: 'Admin', recorded_at: new Date().toISOString() },
+        { temperature: 28.5, humidity: 58.0, uv_index: 5.8, user: 'Admin', recorded_at: new Date(Date.now() - 86400000).toISOString() },
+        { temperature: 24.7, humidity: 50.4, uv_index: 3.3, user: 'Admin', recorded_at: new Date(Date.now() - 172800000).toISOString() }
+      ];
+    }
+
+    analyticsData.sort((a, b) => {
+      const aDate = getRowTimestamp(a);
+      const bDate = getRowTimestamp(b);
+      if (!aDate && !bDate) return 0;
+      if (!aDate) return 1;
+      if (!bDate) return -1;
+      return bDate - aDate;
+    });
+
+    applyFilters();
+  } catch (err) {
+    console.error("Error loading analytics data:", err);
+    filteredData = [];
+    updateStats();
+    updateCharts();
+    updateTable();
+  }
+}
+
+function applyFilters() {
+  const now = new Date();
+  const days = 30;
+  const startDate = new Date(now);
+  startDate.setDate(startDate.getDate() - days);
+  startDate.setHours(0, 0, 0, 0);
+  const endDate = new Date(now);
+  endDate.setHours(23, 59, 59, 999);
+
+  filteredData = analyticsData.filter(row => {
+    const date = getRowTimestamp(row);
+    if (!date) return false;
+    return date >= startDate && date <= endDate;
+  });
+
+  if (!filteredData.length && analyticsData.length) {
+    filteredData = analyticsData.slice(0, 10);
+    console.warn("No records in last 30 days; falling back to latest rows.");
+  }
+
+  if (!filteredData.length && analyticsData.length) {
+    filteredData = analyticsData.slice();
+    console.warn("No valid timestamps found; using all loaded data.");
+  }
+
+  console.log(`Filtered data (last ${days} days):`, filteredData.length, filteredData);
+  updateStats();
+  updateCharts();
+  updateTable();
+}
+
+function updateStats() {
+  const totalAlerts = filteredData.filter(row =>
+    (row.temperature > THRESHOLDS.temperature) ||
+    (row.humidity > THRESHOLDS.humidity) ||
+    (row.uv_index > THRESHOLDS.light)
+  ).length;
+  
+  const tempAlerts = filteredData.filter(row => getTemperature(row) !== null && getTemperature(row) > THRESHOLDS.temperature).length;
+  const humidityAlerts = filteredData.filter(row => getHumidity(row) !== null && getHumidity(row) > THRESHOLDS.humidity).length;
+  const lightAlerts = filteredData.filter(row => getUV(row) !== null && getUV(row) > THRESHOLDS.light).length;
+
+  const statValues = document.querySelectorAll(".stat-value");
+  if (statValues.length >= 5) {
+    statValues[0].textContent = totalAlerts;
+    statValues[1].textContent = tempAlerts;
+    statValues[2].textContent = humidityAlerts;
+    statValues[3].textContent = lightAlerts;
+    // statValues[4] (Total Users) is updated separately by loadUserCount()
+  }
+
+  try {
+    localStorage.setItem('medisafeAnalyticsAlertTotals', JSON.stringify({
+      totalAlerts,
+      temperatureAlerts: tempAlerts,
+      humidityAlerts,
+      uvAlerts: lightAlerts
+    }));
+  } catch (e) {
+    console.warn('Unable to persist analytics totals:', e);
+  }
+}
+
+async function loadUserCount() {
+  const userStatEl = document.querySelectorAll(".stat-value")[4];
+  if (!userStatEl) return;
+
+  userStatEl.textContent = "…";
+
+  // Strategy 1: Try fetching rows directly from known table names.
+  // Using select('id') (just one column) is lightweight.
+  // head:true is avoided because RLS silently returns 0 instead of an error.
+  const TABLES_TO_TRY = ['users', 'profiles'];
+
+  for (const table of TABLES_TO_TRY) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('id');
+
+    if (!error && data) {
+      userStatEl.textContent = data.length;
+      console.log(`Total users fetched from '${table}':`, data.length);
+      return;
+    }
+
+    console.warn(`Could not query '${table}':`, error?.message);
+  }
+
+  // Strategy 2: Use Supabase REST API directly with count header
+  // (works when JS client count is blocked but REST is accessible)
+  try {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/users?select=id`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'count=exact'
+      }
+    });
+    const countHeader = res.headers.get('content-range'); // e.g. "0-11/12"
+    if (countHeader) {
+      const total = parseInt(countHeader.split('/')[1], 10);
+      if (!isNaN(total)) {
+        userStatEl.textContent = total;
+        console.log('Total users via REST count header:', total);
+        return;
+      }
+    }
+    // If header not present, count from response body
+    const rows = await res.json();
+    if (Array.isArray(rows)) {
+      userStatEl.textContent = rows.length;
+      console.log('Total users via REST body length:', rows.length);
+      return;
+    }
+  } catch (e) {
+    console.warn('REST user count failed:', e);
+  }
+
+  // Strategy 3: Last resort — count unique users referenced in sensor data
+  console.warn("All user count strategies failed. Falling back to sensor data.");
+  const fallback = new Set(analyticsData.map(row => row.user).filter(Boolean)).size;
+  userStatEl.textContent = fallback || 0;
+}
+
+function getSensorType(row) {
+  if (row.temperature) return "Temperature";
+  if (row.humidity) return "Humidity";
+  if (row.uv_index) return "UV Index";
+  return "Unknown";
+}
+
+function updateCharts() {
+  if (filteredData.length === 0) return;
+
+  const chartData = filteredData.slice(0, 10);  // 👈 add this line
+  console.log("Chart data:", chartData);
+
+  const labels = chartData.map(row => {
+  const timestamp = getRowTimestamp(row);
+  return timestamp
+    ? timestamp.toLocaleString('en-US', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : '-';
+});
+
+  analyticsChart.data.labels = labels;
+  if (currentFilter === "all") {
+    analyticsChart.data.datasets[0].data = chartData.map(row => getTemperature(row) || 0);
+    analyticsChart.data.datasets[1].data = chartData.map(row => getHumidity(row) || 0);
+    analyticsChart.data.datasets[2].data = chartData.map(row => getUV(row) || 0);
+  } else if (currentFilter === "temperature") {
+    analyticsChart.data.datasets[0].data = chartData.map(row => getTemperature(row) || 0);
+    analyticsChart.data.datasets[1].data = [];
+    analyticsChart.data.datasets[2].data = [];
+  } else if (currentFilter === "humidity") {
+    analyticsChart.data.datasets[0].data = [];
+    analyticsChart.data.datasets[1].data = chartData.map(row => row.humidity || 0);
+    analyticsChart.data.datasets[2].data = [];
+  } else if (currentFilter === "light") {
+    analyticsChart.data.datasets[0].data = [];
+    analyticsChart.data.datasets[1].data = [];
+    analyticsChart.data.datasets[2].data = chartData.map(row => row.uv_index || 0);
+  }
+  
+  analyticsChart.update();
+}
+
+function updateTable() {
+  const tbody = document.querySelector(".reports-tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  let tableData = filteredData.slice(0, 10);
+  console.log("Table data:", tableData);
+  if (currentFilter !== "all") {
+    tableData = tableData.filter(row => {
+      if (currentFilter === "temperature") return safeValue(row.temperature) !== null;
+      if (currentFilter === "humidity") return safeValue(row.humidity) !== null;
+      if (currentFilter === "light") return safeValue(row.uv_index) !== null;
+      return true;
+    });
+  }
+
+  if (tableData.length === 0) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td colspan="8" style="text-align:center;">No analytics data available</td>
+    `;
+    tbody.appendChild(tr);
+    return;
+  }
+
+  tableData.forEach(row => {
+    const tr = createTableRow(row);
+    tbody.appendChild(tr);
+  });
+}
+
+function buildCSV(mode = 'all') {
+  // This is the existing top-level export (triggered alerts / all data via header Export CSV btn)
+  const rows = filteredData.flatMap(row => {
+    const date = new Date(row.recorded_id).toLocaleDateString();
+    const user = row.user || 'Admin';
+
+    const tVal = getTemperature(row);
+    const hVal = getHumidity(row);
+    const uvVal = getUV(row);
+
+    const readings = [
+      { type: 'Temperature', value: tVal, unit: '°C', threshold: THRESHOLDS.temperature },
+      { type: 'Humidity', value: hVal, unit: '%', threshold: THRESHOLDS.humidity },
+      { type: 'UV Index', value: uvVal, unit: ' UVI', threshold: THRESHOLDS.light }
+    ];
+
+    return readings
+      .filter(r => r.value !== null && r.value !== undefined && r.value !== '' && !Number.isNaN(Number(r.value)))
+      .filter(r => mode === 'all' || (mode === 'alerts' && Number(r.value) > r.threshold))
+      .map(r => {
+        const status = Number(r.value) > r.threshold ? 'Alert' : 'Normal';
+        return [date, user, r.type, `${r.value}${r.unit}`, status];
+      });
+  });
+
+  const csv = [
+    ['Date', 'User', 'Sensor Type', 'Value', 'Status'],
+    ...rows
+  ].map(r => r.join(',')).join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = mode === 'alerts' ? 'analytics_triggered_alerts.csv' : 'analytics_report.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Reports Table: export rangeData as CSV ───────────────────────────────────
+function buildReportsTableCSV(rangeData, rangeLabel = 'Full Export') {
+  const sourceData = rangeData;
+
+  const rows = sourceData.map(row => {
+    const timestamp = getRowTimestamp(row);
+    const date = timestamp
+      ? timestamp.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '-';
+    const user = row.user || 'Admin';
+
+    const tempNum = getTemperature(row);
+    const humNum  = getHumidity(row);
+    const uvNum   = getUV(row);
+
+    const tempValue  = tempNum  === null ? '-' : `${tempNum.toFixed(1)}°C`;
+    const tempStatus = tempNum  === null ? '-' : (tempNum  > THRESHOLDS.temperature ? 'Alert' : 'Normal');
+    const humValue   = humNum   === null ? '-' : `${humNum.toFixed(1)}%`;
+    const humStatus  = humNum   === null ? '-' : (humNum   > THRESHOLDS.humidity    ? 'Alert' : 'Normal');
+    const uvValue    = uvNum    === null ? '-' : `${uvNum.toFixed(2)} UVI`;
+    const uvStatus   = uvNum    === null ? '-' : (uvNum    > THRESHOLDS.light       ? 'Alert' : 'Normal');
+
+    // Wrap values that may contain commas in quotes
+    const escape = v => `"${String(v).replace(/"/g, '""')}"`;
+    return [escape(date), escape(tempValue), escape(tempStatus),
+            escape(humValue), escape(humStatus), escape(uvValue), escape(uvStatus)].join(',');
+  });
+
+  const header = '"Date","Temperature","Temp Status","Humidity","Hum Status","UV","UV Status"';
+  const csv = [header, ...rows].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = `analytics_report_${rangeLabel.replace(/\s+/g, '_').toLowerCase()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Reports Table: export rangeData as PDF (print-based) ─────────────────────
+function buildReportsPDF(rangeData, rangeLabel = 'Full Export') {
+  const sourceData = rangeData;
+  const location   = localStorage.getItem('activeLocationName') || 'All Locations';
+  const now        = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const tableRows = sourceData.map(row => {
+    const timestamp = getRowTimestamp(row);
+    const date = timestamp
+      ? timestamp.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      : '-';
+    const user = row.user || 'Admin';
+
+    const tempNum = getTemperature(row);
+    const humNum  = getHumidity(row);
+    const uvNum   = getUV(row);
+
+    const tempValue  = tempNum  === null ? '-' : `${tempNum.toFixed(1)}°C`;
+    const tempStatus = tempNum  === null ? '-' : (tempNum  > THRESHOLDS.temperature ? 'Alert' : 'Normal');
+    const humValue   = humNum   === null ? '-' : `${humNum.toFixed(1)}%`;
+    const humStatus  = humNum   === null ? '-' : (humNum   > THRESHOLDS.humidity    ? 'Alert' : 'Normal');
+    const uvValue    = uvNum    === null ? '-' : `${uvNum.toFixed(2)} UVI`;
+    const uvStatus   = uvNum    === null ? '-' : (uvNum    > THRESHOLDS.light       ? 'Alert' : 'Normal');
+
+    const statusBadge = (s) =>
+      s === '-' ? '-'
+      : s === 'Alert'
+        ? `<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">Alert</span>`
+        : `<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;">Normal</span>`;
+
+    return `
+      <tr>
+        <td>${date}</td>
+        <td>${tempValue}</td>
+        <td>${statusBadge(tempStatus)}</td>
+        <td>${humValue}</td>
+        <td>${statusBadge(humStatus)}</td>
+        <td>${uvValue}</td>
+        <td>${statusBadge(uvStatus)}</td>
+      </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Analytics — MediSafe</title>
-
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-
-  <link rel="stylesheet" href="dashboard_page.css">
-  <link rel="stylesheet" href="analytics_page.css">
-  <link rel="stylesheet" href="theme.css">
-
+  <meta charset="utf-8"/>
+  <title>MediSafe Analytics Report</title>
   <style>
-    /* ── Export button in header ── */
-    .export-table-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      padding: 7px 16px; background: #2563eb; color: #fff;
-      border: none; border-radius: 8px; font-size: 13px;
-      font-weight: 600; cursor: pointer; transition: background 0.2s; white-space: nowrap;
-    }
-    .export-table-btn:hover { background: #1d4ed8; }
+    @page { size: A4 landscape; margin: 18mm 14mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', Arial, sans-serif; font-size: 11px; color: #111; background: #fff; }
 
-    /* ── 3-col insight grid (replaces the two removed tables) ── */
-    .insight-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      margin-bottom: 24px;
-    }
-    .insight-grid-bottom {
-      display: grid;
-      grid-template-columns: 1fr 2fr;
-      gap: 24px;
-      margin-bottom: 24px;
-    }
-    @media (max-width: 1200px) {
-      .insight-grid        { grid-template-columns: 1fr 1fr; }
-      .insight-grid-bottom { grid-template-columns: 1fr; }
-    }
-    @media (max-width: 768px) {
-      .insight-grid        { grid-template-columns: 1fr; }
-      .insight-grid-bottom { grid-template-columns: 1fr; }
-    }
+    /* Header */
+    .pdf-header { display: flex; justify-content: space-between; align-items: flex-start;
+                  border-bottom: 3px solid #2563eb; padding-bottom: 14px; margin-bottom: 20px; }
+    .pdf-brand  { display: flex; align-items: center; gap: 12px; }
+    .pdf-logo   { font-size: 36px; }
+    .pdf-title  { font-size: 20px; font-weight: 700; color: #111; }
+    .pdf-sub    { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .pdf-meta   { text-align: right; font-size: 11px; color: #374151; line-height: 1.8; }
+    .pdf-meta span { font-weight: 600; color: #111; }
 
-    /* ── Shared insight card ── */
-    .insight-card {
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow: 0 2px 8px var(--shadow-sm);
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      transition: background 0.3s, border-color 0.3s;
-    }
-    .insight-card-title {
-      font-size: 15px;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin: 0;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .insight-card-subtitle {
-      font-size: 12px;
-      color: var(--text-secondary);
-      font-weight: 400;
-      margin-top: 2px;
-    }
+    /* Table */
+    table  { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    thead  { background: #2563eb; color: #fff; }
+    th     { padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    td     { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
+    tr:nth-child(even) td { background: #f8fafc; }
+    tr:last-child td { border-bottom: none; }
 
-    /* ── Top-left: Doughnut ── */
-    .doughnut-wrap {
-      position: relative;
-      height: 200px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .doughnut-center {
-      position: absolute;
-      text-align: center;
-      pointer-events: none;
-    }
-    .doughnut-center-value {
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--text-primary);
-      line-height: 1;
-    }
-    .doughnut-center-label {
-      font-size: 11px;
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-    .doughnut-legend {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .doughnut-legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--text-primary);
-    }
-    .doughnut-legend-dot {
-      width: 10px; height: 10px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .doughnut-legend-pct {
-      margin-left: auto;
-      font-weight: 700;
-      font-size: 13px;
-    }
-
-    /* ── Top-middle: System counts ── */
-    .counts-grid {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      flex: 1;
-    }
-    .count-item {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      padding: 14px 16px;
-      border-radius: 12px;
-      background: var(--bg-primary);
-      border: 1px solid var(--border-color);
-      transition: background 0.3s;
-    }
-    .count-icon {
-      width: 42px; height: 42px;
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; flex-shrink: 0;
-    }
-    .count-body { display: flex; flex-direction: column; gap: 2px; }
-    .count-value {
-      font-size: 24px; font-weight: 700;
-      color: var(--text-primary); line-height: 1;
-    }
-    .count-label { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
-
-    /* ── Top-right: Peak readings bar ── */
-    .peak-chart-wrap { height: 200px; position: relative; }
-    .peak-details {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-    }
-    .peak-detail-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 12px;
-      color: var(--text-secondary);
-      padding: 4px 0;
-      border-bottom: 1px solid var(--border-color);
-    }
-    .peak-detail-row:last-child { border-bottom: none; }
-    .peak-detail-label { font-weight: 600; color: var(--text-primary); }
-    .peak-detail-time  { font-size: 11px; color: var(--text-muted, #9ca3af); }
-
-    /* ── Bottom-left: Heatmap ── */
-    .heatmap-wrap {
-      overflow-x: auto;
-    }
-    .heatmap-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 11px;
-    }
-    .heatmap-table th {
-      padding: 5px 6px;
-      text-align: center;
-      font-weight: 600;
-      color: var(--text-secondary);
-      white-space: nowrap;
-    }
-    .heatmap-table td {
-      padding: 5px 4px;
-      text-align: center;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      cursor: default;
-      transition: opacity 0.15s;
-      min-width: 28px;
-    }
-    .heatmap-table td:hover { opacity: 0.75; }
-    .heatmap-row-label {
-      text-align: left !important;
-      font-weight: 600;
-      color: var(--text-secondary);
-      white-space: nowrap;
-      padding-right: 8px !important;
-    }
-    .heatmap-legend {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 10px;
-      font-size: 11px;
-      color: var(--text-secondary);
-    }
-    .heatmap-legend-bar {
-      display: flex;
-      gap: 2px;
-    }
-    .heatmap-legend-swatch {
-      width: 18px; height: 10px; border-radius: 2px;
-    }
-
-    /* ── Bottom-right: Gauge row ── */
-    .gauge-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      flex: 1;
-    }
-    @media (max-width: 900px) { .gauge-row { grid-template-columns: 1fr; } }
-
-    .gauge-item {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 6px;
-    }
-    .gauge-canvas-wrap {
-      position: relative;
-      width: 100%;
-      max-width: 160px;
-    }
-    .gauge-canvas-wrap canvas { display: block; width: 100% !important; }
-    .gauge-center {
-      position: absolute;
-      bottom: 6px;
-      left: 50%; transform: translateX(-50%);
-      text-align: center;
-      pointer-events: none;
-      white-space: nowrap;
-    }
-    .gauge-value {
-      font-size: 20px; font-weight: 700;
-      color: var(--text-primary); line-height: 1;
-    }
-    .gauge-unit { font-size: 11px; color: var(--text-secondary); }
-    .gauge-label {
-      font-size: 13px; font-weight: 600;
-      color: var(--text-primary); text-align: center;
-    }
-    .gauge-status {
-      font-size: 11px; font-weight: 700;
-      padding: 3px 10px; border-radius: 20px;
-      text-align: center;
-    }
-    .gauge-status.normal  { background: #d1fae5; color: #065f46; }
-    .gauge-status.alert   { background: #fee2e2; color: #991b1b; }
-    .gauge-threshold {
-      font-size: 10px; color: var(--text-muted, #9ca3af);
-      text-align: center;
-    }
-
-    /* ── Live pulse dot ── */
-    @keyframes pulse {
-      0%,100% { opacity: 1; transform: scale(1); }
-      50%      { opacity: 0.4; transform: scale(1.4); }
-    }
-    .live-dot {
-      display: inline-block;
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      animation: pulse 1.4s ease-in-out infinite;
-      margin-right: 4px;
-      vertical-align: middle;
-    }
-
-    /* ── Range selector buttons ── */
-    .range-btn {
-      display: flex; align-items: center; gap: 10px;
-      width: 100%; padding: 11px 14px;
-      background: #f8fafc; border: 1.5px solid #e5e7eb; border-radius: 10px;
-      font-size: 14px; font-weight: 500; color: #111; cursor: pointer;
-      transition: border-color 0.15s, background 0.15s; text-align: left;
-    }
-    .range-btn:hover { background: #eff6ff; border-color: #2563eb; color: #2563eb; }
-    .range-btn-all   { border-style: dashed; }
-    .range-label     { flex: 1; }
-    .range-arrow     { color: #9ca3af; font-size: 18px; font-weight: 400; }
-    .range-btn:hover .range-arrow { color: #2563eb; }
+    /* Footer */
+    .pdf-footer { margin-top: 20px; text-align: center; font-size: 10px; color: #9ca3af;
+                  border-top: 1px solid #e5e7eb; padding-top: 10px; }
   </style>
 </head>
 <body>
-  <div class="app-container">
-    <!-- Sidebar -->
-    <div class="sidebar">
-      <div class="logo-section">
-        <div class="logo">🏥</div>
-        <div class="brand-name">MediSafe</div>
-      </div>
-      <div class="nav-section">
-        <a href="dashboard_page.html" class="nav-item">
-          <span class="nav-icon">🏠</span><span class="nav-text">Home</span>
-        </a>
-        <a href="history_page.html" class="nav-item">
-          <span class="nav-icon">🕒</span><span class="nav-text">Threshold History</span>
-        </a>
-        <a href="analytics_page.html" class="nav-item active">
-          <span class="nav-icon">📊</span><span class="nav-text">Analytics</span>
-        </a>
-        <a href="sensors_location.html" class="nav-item">
-          <span class="nav-icon">📍</span><span class="nav-text">Sensor Locations</span>
-        </a>
-        <a href="audit_trail_local.html" class="nav-item">
-          <span class="nav-icon">📋</span><span class="nav-text">Audit Trail</span>
-        </a>
-        <a href="monitoring_log.html" class="nav-item">
-          <span class="nav-icon">🩺</span><span class="nav-text">Monitoring Log</span>
-        </a>
-        <a href="users_page.html" class="nav-item">
-          <span class="nav-icon">👥</span><span class="nav-text">Users</span>
-        </a>
-        <a href="settings_page.html" class="nav-item">
-          <span class="nav-icon">⚙️</span><span class="nav-text">Settings</span>
-        </a>
-      </div>
-      <div class="profile-section">
-        <a href="profile_page.html" class="profile-link">
-          <div class="avatar-placeholder"></div>
-        </a>
-        <a href="login_page.html" class="nav-item logout-item">
-          <span class="nav-icon">🚪</span><span class="nav-text">Logout</span>
-        </a>
+  <div class="pdf-header">
+    <div class="pdf-brand">
+      <div class="pdf-logo">🏥</div>
+      <div>
+        <div class="pdf-title">MediSafe Analytics Report</div>
+        <div class="pdf-sub">Casimiro A. Ynares Sr. Memorial Hospital — ${rangeLabel}</div>
       </div>
     </div>
-
-    <!-- Main Content -->
-    <div class="main-content">
-      <div class="header">
-        <span id="page-title">Analytics</span>
-        <div class="header-actions">
-          <button class="export-btn" id="exportBtn">
-            <span>📥</span><span>Export CSV</span>
-          </button>
-          <button class="export-table-btn" id="exportTableBtn">
-            <span>📄</span><span>Export Report</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="content-body">
-
-        <!-- ── Stats Overview (unchanged) ── -->
-        <div class="stats-grid">
-          <div class="stat-card primary">
-            <div class="stat-icon">⚠️</div>
-            <div class="stat-content">
-              <div class="stat-value">0</div>
-              <div class="stat-label">Total Alerts This Week</div>
-            </div>
-          </div>
-          <div class="stat-card temperature">
-            <div class="stat-icon">🌡️</div>
-            <div class="stat-content">
-              <div class="stat-value">0</div>
-              <div class="stat-label">Temperature Alerts</div>
-            </div>
-          </div>
-          <div class="stat-card humidity">
-            <div class="stat-icon">💧</div>
-            <div class="stat-content">
-              <div class="stat-value">0</div>
-              <div class="stat-label">Humidity Alerts</div>
-            </div>
-          </div>
-          <div class="stat-card light">
-            <div class="stat-icon">💡</div>
-            <div class="stat-content">
-              <div class="stat-value">0</div>
-              <div class="stat-label">UV Intensity Alerts</div>
-            </div>
-          </div>
-          <div class="stat-card users">
-            <div class="stat-icon">👥</div>
-            <div class="stat-content">
-              <div class="stat-value">0</div>
-              <div class="stat-label">Total Users</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Weekly Sensor Trends (unchanged) ── -->
-        <div class="chart-section">
-          <div class="chart-card">
-            <div class="chart-card-header">
-              <h2>Weekly Sensor Trends</h2>
-              <div class="chart-filters">
-                <button class="filter-btn active" data-filter="all">All Data</button>
-                <button class="filter-btn" data-filter="temperature">Temperature</button>
-                <button class="filter-btn" data-filter="humidity">Humidity</button>
-                <button class="filter-btn" data-filter="light">UV</button>
-              </div>
-            </div>
-            <div class="chart-container">
-              <canvas id="analyticsChart"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <!-- ══════════════════════════════════════════════════ -->
-        <!-- TOP ROW: Doughnut | System Counts | Peak Readings -->
-        <!-- ══════════════════════════════════════════════════ -->
-        <div class="insight-grid">
-
-          <!-- TOP LEFT: Alert Breakdown Doughnut -->
-          <div class="insight-card">
-            <div>
-              <p class="insight-card-title">🍩 Alert Breakdown by Type</p>
-              <p class="insight-card-subtitle">Last 30 days — % of total alerts</p>
-            </div>
-            <div class="doughnut-wrap">
-              <canvas id="alertDoughnut"></canvas>
-              <div class="doughnut-center">
-                <div class="doughnut-center-value" id="doughnut-total">0</div>
-                <div class="doughnut-center-label">Total Alerts</div>
-              </div>
-            </div>
-            <div class="doughnut-legend">
-              <div class="doughnut-legend-item">
-                <span class="doughnut-legend-dot" style="background:#FF0531;"></span>
-                Temperature
-                <span class="doughnut-legend-pct" id="pct-temp">—</span>
-              </div>
-              <div class="doughnut-legend-item">
-                <span class="doughnut-legend-dot" style="background:#3b82f6;"></span>
-                Humidity
-                <span class="doughnut-legend-pct" id="pct-hum">—</span>
-              </div>
-              <div class="doughnut-legend-item">
-                <span class="doughnut-legend-dot" style="background:#f59e0b;"></span>
-                UV Index
-                <span class="doughnut-legend-pct" id="pct-uv">—</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- TOP MIDDLE: System Counts -->
-          <div class="insight-card">
-            <div>
-              <p class="insight-card-title">📋 System Overview</p>
-              <p class="insight-card-subtitle">Live record counts across the system</p>
-            </div>
-            <div class="counts-grid">
-              <div class="count-item">
-                <div class="count-icon" style="background:linear-gradient(135deg,#05318a,#4a9fd8);">📍</div>
-                <div class="count-body">
-                  <div class="count-value" id="sys-locations">—</div>
-                  <div class="count-label">Sensor Locations</div>
-                </div>
-              </div>
-              <div class="count-item">
-                <div class="count-icon" style="background:linear-gradient(135deg,#7c3aed,#a78bfa);">📋</div>
-                <div class="count-body">
-                  <div class="count-value" id="sys-audit">—</div>
-                  <div class="count-label">Audit Trail Records</div>
-                </div>
-              </div>
-              <div class="count-item">
-                <div class="count-icon" style="background:linear-gradient(135deg,#0891b2,#22d3ee);">🩺</div>
-                <div class="count-body">
-                  <div class="count-value" id="sys-monitoring">—</div>
-                  <div class="count-label">Monitoring Log Entries</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- TOP RIGHT: Peak Readings Bar -->
-          <div class="insight-card">
-            <div>
-              <p class="insight-card-title">📈 Highest Readings Recorded</p>
-              <p class="insight-card-subtitle">All-time peak per sensor type</p>
-            </div>
-            <div class="peak-chart-wrap">
-              <canvas id="peakBar"></canvas>
-            </div>
-            <div class="peak-details">
-              <div class="peak-detail-row">
-                <span class="peak-detail-label" style="color:#FF0531;">🌡️ Temp Peak</span>
-                <span id="peak-temp-val">—</span>
-                <span class="peak-detail-time" id="peak-temp-time">—</span>
-              </div>
-              <div class="peak-detail-row">
-                <span class="peak-detail-label" style="color:#3b82f6;">💧 Humidity Peak</span>
-                <span id="peak-hum-val">—</span>
-                <span class="peak-detail-time" id="peak-hum-time">—</span>
-              </div>
-              <div class="peak-detail-row">
-                <span class="peak-detail-label" style="color:#f59e0b;">☀️ UV Peak</span>
-                <span id="peak-uv-val">—</span>
-                <span class="peak-detail-time" id="peak-uv-time">—</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ═══════════════════════════════════════════════ -->
-        <!-- BOTTOM ROW: Heatmap  |  Gauge Charts (live)    -->
-        <!-- ═══════════════════════════════════════════════ -->
-        <div class="insight-grid-bottom">
-
-          <!-- BOTTOM LEFT: Alerts Heatmap by Day × Hour -->
-          <div class="insight-card">
-            <div>
-              <p class="insight-card-title">🗓️ Alert Heatmap — Day × Hour</p>
-              <p class="insight-card-subtitle">When do alerts happen most? (last 30 days)</p>
-            </div>
-            <div class="heatmap-wrap">
-              <table class="heatmap-table" id="heatmapTable">
-                <thead id="heatmapHead"></thead>
-                <tbody id="heatmapBody"></tbody>
-              </table>
-            </div>
-            <div class="heatmap-legend">
-              <span>Low</span>
-              <div class="heatmap-legend-bar" id="heatmapLegend"></div>
-              <span>High</span>
-            </div>
-          </div>
-
-          <!-- BOTTOM RIGHT: Live Gauge Charts -->
-          <div class="insight-card">
-            <div>
-              <p class="insight-card-title">
-                <span class="live-dot"></span> Live Sensor Gauges
-              </p>
-              <p class="insight-card-subtitle">
-                Active location: <strong id="gauge-loc-name">—</strong> · updates every 10 s
-              </p>
-            </div>
-            <div class="gauge-row">
-              <!-- Temperature Gauge -->
-              <div class="gauge-item">
-                <div class="gauge-canvas-wrap">
-                  <canvas id="gaugeTemp" height="110"></canvas>
-                  <div class="gauge-center">
-                    <div class="gauge-value" id="gauge-temp-val">—</div>
-                    <div class="gauge-unit">°C</div>
-                  </div>
-                </div>
-                <div class="gauge-label">🌡️ Temperature</div>
-                <div class="gauge-status normal" id="gauge-temp-status">Normal</div>
-                <div class="gauge-threshold">Threshold: 30°C</div>
-              </div>
-              <!-- Humidity Gauge -->
-              <div class="gauge-item">
-                <div class="gauge-canvas-wrap">
-                  <canvas id="gaugeHum" height="110"></canvas>
-                  <div class="gauge-center">
-                    <div class="gauge-value" id="gauge-hum-val">—</div>
-                    <div class="gauge-unit">%</div>
-                  </div>
-                </div>
-                <div class="gauge-label">💧 Humidity</div>
-                <div class="gauge-status normal" id="gauge-hum-status">Normal</div>
-                <div class="gauge-threshold">Threshold: 60%</div>
-              </div>
-              <!-- UV Gauge -->
-              <div class="gauge-item">
-                <div class="gauge-canvas-wrap">
-                  <canvas id="gaugeUV" height="110"></canvas>
-                  <div class="gauge-center">
-                    <div class="gauge-value" id="gauge-uv-val">—</div>
-                    <div class="gauge-unit">UVI</div>
-                  </div>
-                </div>
-                <div class="gauge-label">☀️ UV Index</div>
-                <div class="gauge-status normal" id="gauge-uv-status">Normal</div>
-                <div class="gauge-threshold">Threshold: 6 UVI</div>
-              </div>
-            </div>
-          </div>
-
-        </div>
-        <!-- end bottom row -->
-
-      </div><!-- end content-body -->
-    </div><!-- end main-content -->
-  </div><!-- end app-container -->
-
-  <!-- Export CSV Modal -->
-  <div id="exportModal" class="custom-modal" style="display: none;">
-    <div class="modal-content">
-      <h3 style="color:black;margin-bottom:20px;">Export Options</h3>
-      <p style="color:#4b5563;margin-bottom:25px;">Choose what data to export:</p>
-      <div style="display:flex;flex-direction:column;gap:15px;">
-        <button id="exportAlertsBtn" class="btn-primary" style="width:100%;">📊 Triggered Alerts</button>
-        <button id="exportAllBtn"    class="btn-secondary" style="width:100%;">📋 All Data</button>
-      </div>
-      <div style="margin-top:20px;text-align:center;">
-        <button id="cancelExportBtn" class="btn-secondary">Cancel</button>
-      </div>
+    <div class="pdf-meta">
+      <div>Report Date: <span>${now}</span></div>
+      <div>Location: <span>${location}</span></div>
+      <div>Total Records: <span>${sourceData.length}</span></div>
+      <div>Generated By: <span>MediSafe System</span></div>
     </div>
   </div>
 
-  <!-- Reports Export Modal (2-step) -->
-  <div id="reportExportModal" class="custom-modal" style="display: none;">
-    <div class="modal-content" style="max-width:380px;width:90%;">
-      <div id="reportExportStep1">
-        <h3 style="color:black;margin-bottom:6px;">Export Analytics Report</h3>
-        <p style="color:#6b7280;font-size:13px;margin-bottom:18px;">Select the date range to export:</p>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <button class="range-btn" data-days="7"><span class="range-label">Last 7 Days</span><span class="range-arrow">›</span></button>
-          <button class="range-btn" data-days="30"><span class="range-label">Last 1 Month</span><span class="range-arrow">›</span></button>
-          <button class="range-btn" data-days="60"><span class="range-label">Last 2 Months</span><span class="range-arrow">›</span></button>
-          <button class="range-btn" data-days="90"><span class="range-label">Last 3 Months</span><span class="range-arrow">›</span></button>
-          <button class="range-btn range-btn-all" data-days="0"><span class="range-label">All Time</span><span class="range-arrow">›</span></button>
-        </div>
-        <div style="margin-top:18px;text-align:center;">
-          <button id="cancelReportExportBtn" class="btn-secondary">Cancel</button>
-        </div>
-      </div>
-      <div id="reportExportStep2" style="display:none;">
-        <button id="reportExportBackBtn" style="background:none;border:none;color:#2563eb;font-size:13px;font-weight:600;cursor:pointer;padding:0;margin-bottom:14px;">‹ Back</button>
-        <h3 style="color:black;margin-bottom:4px;">Choose Format</h3>
-        <p id="reportExportRangeLabel" style="color:#6b7280;font-size:13px;margin-bottom:18px;"></p>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          <button id="reportExportCsvBtn" class="btn-primary" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;"><span>📄</span> Export as CSV</button>
-          <button id="reportExportPdfBtn" class="btn-secondary" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;"><span>🖨️</span> Export as PDF</button>
-        </div>
-      </div>
-    </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Temperature</th>
+        <th>Temp Status</th>
+        <th>Humidity</th>
+        <th>Hum Status</th>
+        <th>UV</th>
+        <th>UV Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${tableRows || '<tr><td colspan="7" style="text-align:center;padding:20px;">No data available</td></tr>'}
+    </tbody>
+  </table>
+
+  <div class="pdf-footer">
+    MediSafe &mdash; Confidential Sensor Report &mdash; Generated on ${now}
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-  <script src="profile_sync.js"></script>
-  <script type="module" src="analytics.js"></script>
-  <script src="theme.js"></script>
+  <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); };<\/script>
 </body>
-</html>
+</html>`;
+
+  const blob   = new Blob([html], { type: 'text/html' });
+  const url    = URL.createObjectURL(blob);
+  const win    = window.open(url, '_blank');
+  if (!win) {
+    alert('Pop-up blocked. Please allow pop-ups for this site and try again.');
+  }
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+function openExportModal() {
+  const modal = document.getElementById('exportModal');
+  if (!modal) return;
+  modal.style.display = 'flex';
+}
+
+function closeExportModal() {
+  const modal = document.getElementById('exportModal');
+  if (!modal) return;
+  modal.style.display = 'none';
+}
+
+function setupFilterButtons() {
+  document.querySelectorAll(".chart-filters .filter-btn").forEach(btn => {
+    btn.addEventListener("click", function() {
+      document.querySelectorAll(".chart-filters .filter-btn").forEach(b => b.classList.remove("active"));
+      this.classList.add("active");
+      currentFilter = this.dataset.filter;
+      updateCharts();
+    });
+  });
+}
+
+function setupExportButton() {
+  const exportBtn = document.getElementById('exportBtn');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', openExportModal);
+  }
+
+  const exportAllBtn = document.getElementById('exportAllBtn');
+  if (exportAllBtn) {
+    exportAllBtn.addEventListener('click', () => {
+      buildCSV('all');
+      closeExportModal();
+    });
+  }
+
+  const exportAlertsBtn = document.getElementById('exportAlertsBtn');
+  if (exportAlertsBtn) {
+    exportAlertsBtn.addEventListener('click', () => {
+      buildCSV('alerts');
+      closeExportModal();
+    });
+  }
+
+  const cancelExportBtn = document.getElementById('cancelExportBtn');
+  if (cancelExportBtn) {
+    cancelExportBtn.addEventListener('click', closeExportModal);
+  }
+
+  // ── Reports Table export modal (2-step: range → format) ────────────────────
+  const exportTableBtn = document.getElementById('exportTableBtn');
+  const reportExportModal = document.getElementById('reportExportModal');
+  const step1 = document.getElementById('reportExportStep1');
+  const step2 = document.getElementById('reportExportStep2');
+  const rangeLabel = document.getElementById('reportExportRangeLabel');
+
+  // Helper: filter analyticsData by number of days (0 = all time)
+  function getDataForRange(days) {
+    const all = analyticsData.length > 0 ? analyticsData : filteredData;
+    if (!days) return all;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    cutoff.setHours(0, 0, 0, 0);
+    const sliced = all.filter(row => {
+      const ts = getRowTimestamp(row);
+      return ts && ts >= cutoff;
+    });
+    return sliced.length > 0 ? sliced : all; // fallback to all if empty
+  }
+
+  const RANGE_LABELS = { 7: 'Last 7 Days', 30: 'Last 1 Month', 60: 'Last 2 Months', 90: 'Last 3 Months', 0: 'All Time' };
+
+  let selectedRangeData = [];
+  let selectedRangeLabel = '';
+
+  function closeReportModal() {
+    if (reportExportModal) reportExportModal.style.display = 'none';
+    // Reset to step 1 after a moment so re-open feels fresh
+    setTimeout(() => {
+      if (step1) step1.style.display = 'block';
+      if (step2) step2.style.display = 'none';
+    }, 200);
+  }
+
+  if (exportTableBtn) {
+    exportTableBtn.addEventListener('click', () => {
+      if (step1) step1.style.display = 'block';
+      if (step2) step2.style.display = 'none';
+      if (reportExportModal) reportExportModal.style.display = 'flex';
+    });
+  }
+
+  // Range buttons (Step 1)
+  document.querySelectorAll('.range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const days = Number(btn.dataset.days);
+      selectedRangeData  = getDataForRange(days);
+      selectedRangeLabel = RANGE_LABELS[days] || 'All Time';
+      if (rangeLabel) rangeLabel.textContent = `${selectedRangeData.length} record(s) · ${selectedRangeLabel}`;
+      if (step1) step1.style.display = 'none';
+      if (step2) step2.style.display = 'block';
+    });
+  });
+
+  // Back button (Step 2 → Step 1)
+  const backBtn = document.getElementById('reportExportBackBtn');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      if (step2) step2.style.display = 'none';
+      if (step1) step1.style.display = 'block';
+    });
+  }
+
+  // CSV (Step 2)
+  const reportExportCsvBtn = document.getElementById('reportExportCsvBtn');
+  if (reportExportCsvBtn) {
+    reportExportCsvBtn.addEventListener('click', () => {
+      buildReportsTableCSV(selectedRangeData, selectedRangeLabel);
+      closeReportModal();
+    });
+  }
+
+  // PDF (Step 2)
+  const reportExportPdfBtn = document.getElementById('reportExportPdfBtn');
+  if (reportExportPdfBtn) {
+    reportExportPdfBtn.addEventListener('click', () => {
+      buildReportsPDF(selectedRangeData, selectedRangeLabel);
+      closeReportModal();
+    });
+  }
+
+  // Cancel (Step 1)
+  const cancelReportExportBtn = document.getElementById('cancelReportExportBtn');
+  if (cancelReportExportBtn) {
+    cancelReportExportBtn.addEventListener('click', closeReportModal);
+  }
+}
+
+function setupPrintButton() {
+  const printBtn = document.getElementById("printBtn");
+  if (printBtn) {
+    printBtn.addEventListener("click", printReport);
+  }
+}
+
+function printReport() {
+  // Populate stats exactly from dashboard cards (print template layout)
+  const printStats = document.getElementById("printStats");
+  if (printStats) {
+    const statValues = document.querySelectorAll(".stat-card .stat-value");
+    printStats.innerHTML = `
+      <div class="print-summary-row">
+        <div class="print-summary-item">
+          <div class="summary-label">Total Alerts</div>
+          <div class="summary-value">${statValues[0]?.textContent || 0}</div>
+        </div>
+        <div class="print-summary-item">
+          <div class="summary-label">Temperature Alerts</div>
+          <div class="summary-value">${statValues[1]?.textContent || 0}</div>
+        </div>
+        <div class="print-summary-item">
+          <div class="summary-label">Humidity Alerts</div>
+          <div class="summary-value">${statValues[2]?.textContent || 0}</div>
+        </div>
+        <div class="print-summary-item">
+          <div class="summary-label">Light Alerts</div>
+          <div class="summary-value">${statValues[3]?.textContent || 0}</div>
+        </div>
+      </div>
+      <div style="height: 60px;"></div> <!-- Spacer for space below summary stats -->
+    `;
+  }
+
+
+  // Populate dates
+  const printDate = document.getElementById("printDate");
+  if (printDate) {
+    printDate.textContent = new Date().toLocaleDateString();
+  }
+
+  const printPeriod = document.getElementById("printPeriod");
+  if (printPeriod) {
+    printPeriod.textContent = "Last 30 Days";
+  }
+
+  const printLocation = document.getElementById("printLocation");
+  if (printLocation) {
+    printLocation.textContent = localStorage.getItem('activeLocationName') || "All Locations";
+  }
+
+  const printGeneratedBy = document.getElementById("printGeneratedBy");
+  if (printGeneratedBy) {
+    printGeneratedBy.textContent = "MediSafe System";
+  }
+
+  // Copy chart as image - now positioned below stats with space
+  const printChart = document.getElementById("printChart");
+  const canvas = document.getElementById("analyticsChart");
+  if (printChart && canvas) {
+    printChart.style.marginTop = "20px";
+    printChart.style.padding = "20px";
+    printChart.style.border = "1px solid #e5e7eb";
+    printChart.style.borderRadius = "8px";
+    printChart.style.background = "#f8fafc";
+    const img = document.createElement("img");
+    img.src = canvas.toDataURL();
+    img.style.maxWidth = "100%";
+    img.style.height = "auto";
+    printChart.innerHTML = "";
+    printChart.appendChild(img);
+  }
+
+
+  // Create horizontal table for print directly from filteredData
+  const printTable = document.getElementById("printTable");
+  if (printTable) {
+    const tableRows = filteredData
+      .slice(0, 10)
+      .filter(row => {
+        if (currentFilter === "temperature") return row.temperature !== null;
+        if (currentFilter === "humidity") return row.humidity !== null;
+        if (currentFilter === "light") return row.uv_index !== null;
+        return true;
+      })
+      .map(row => {
+        const date = row.recorded_id
+          ? new Date(row.recorded_id).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+          : '-';
+
+        const tempVal = row.temperature !== null && !Number.isNaN(Number(row.temperature)) ? Number(row.temperature).toFixed(1) : null;
+        const humVal = row.humidity !== null && !Number.isNaN(Number(row.humidity)) ? Number(row.humidity).toFixed(1) : null;
+        const uvVal = row.uv_index !== null && !Number.isNaN(Number(row.uv_index)) ? Number(row.uv_index).toFixed(2) : null;
+
+        const tempStatus = getStatus(tempVal, THRESHOLDS.temperature);
+        const humStatus = getStatus(humVal, THRESHOLDS.humidity);
+        const uvStatus = getStatus(uvVal, THRESHOLDS.light);
+
+        return `
+          <tr>
+            <td>${date}</td>
+            <td>${tempVal !== null ? `${tempVal}°C` : '-'}</td>
+            <td>${tempVal !== null ? `<span class="${getStatusClass(tempStatus)}">${tempStatus}</span>` : '-'}</td>
+            <td>${humVal !== null ? `${humVal}%` : '-'}</td>
+            <td>${humVal !== null ? `<span class="${getStatusClass(humStatus)}">${humStatus}</span>` : '-'}</td>
+            <td>${uvVal !== null ? `${uvVal} UVI` : '-'}</td>
+            <td>${uvVal !== null ? `<span class="${getStatusClass(uvStatus)}">${uvStatus}</span>` : '-'}</td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    const table = document.createElement("table");
+    table.classList.add("print-table");
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Temperature</th>
+          <th>Temp Status</th>
+          <th>Humidity</th>
+          <th>Hum Status</th>
+          <th>UV</th>
+          <th>UV Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows || '<tr><td colspan="7">No data available</td></tr>'}
+      </tbody>
+    `;
+
+    printTable.innerHTML = "";
+    printTable.appendChild(table);
+  }
+
+  // Hide main content and show print template
+  const appContainer = document.querySelector(".app-container");
+  if (appContainer) appContainer.style.display = "none";
+
+  const printTemplate = document.getElementById("printTemplate");
+  if (printTemplate) {
+    printTemplate.style.display = "block";
+    printTemplate.classList.add("print-ready");
+  }
+
+  const restoreView = () => {
+    if (appContainer) appContainer.style.display = "block";
+    if (printTemplate) {
+      printTemplate.style.display = "none";
+      printTemplate.classList.remove("print-ready");
+    }
+    window.onafterprint = null;
+  };
+
+  window.onafterprint = restoreView;
+
+  // Fallback restore in case onafterprint is unsupported
+  setTimeout(() => {
+    if (printTemplate && printTemplate.style.display === "block") {
+      restoreView();
+    }
+  }, 5000);
+
+  // Print
+  window.print();
+}
+
+// Initialize when DOM is ready
+document.addEventListener("DOMContentLoaded", function() {
+  initializeChart();
+  setupFilterButtons();
+  setupExportButton();
+  setupPrintButton();
+  loadAnalyticsData();
+  loadDashboardData();
+  loadUserCount();        // ← fetch real user count from Supabase
+  subscribeToSensorUpdates();
+});
+
+
+const LOCATIONS_PER_PAGE = 5;
+let currentPage = 1;
+let allLocations = [];
+
+async function loadDashboardData() {
+  const { data: locations, error: locError } = await supabase
+    .from('location')
+    .select('*');
+
+  if (locError) return;
+
+  allLocations = locations;
+  renderLocationPage(currentPage);
+}
+
+async function renderLocationPage(page) {
+  const tableBody = document.getElementById('data-table');
+  if (!tableBody) return;
+
+  const activeLocId = localStorage.getItem('activeLocationId');
+  const start = (page - 1) * LOCATIONS_PER_PAGE;
+  const pageLocations = allLocations.slice(start, start + LOCATIONS_PER_PAGE);
+
+  // Fetch all sensor readings in parallel before touching the DOM
+  const readings = await Promise.all(
+    pageLocations.map(loc =>
+      supabase
+        .from('sensors')
+        .select('temperature, humidity, uv_index')
+        .eq('location_id', loc.id)
+        .order('recorded_id', { ascending: false })
+        .limit(1)
+        .then(({ data }) =>
+          data && data.length > 0
+            ? data[0]
+            : { temperature: '--', humidity: '--', uv_index: '--' }
+        )
+    )
+  );
+
+  // Build all rows in a fragment — no repaints until the swap below
+  const fragment = document.createDocumentFragment();
+  pageLocations.forEach((loc, i) => {
+    const reading = readings[i];
+    const isChecked = activeLocId == loc.id ? 'checked' : '';
+    const tr = document.createElement('tr');
+    tr.dataset.id = loc.id;
+    tr.innerHTML = `
+      <td><input type="radio" name="activeLocation" data-loc-id="${loc.id}" data-loc-name="${loc.locations}" ${isChecked}></td>
+      <td><strong>${loc.locations}</strong></td>
+      <td>${new Date(loc.created_at).toLocaleDateString()}</td>
+      <td>${reading.temperature}°C</td>
+      <td>${reading.humidity}%</td>
+      <td>${reading.uv_index === '--' ? '--' : Number.parseFloat(reading.uv_index).toFixed(2)} UV</td>
+      <td><button class="action-btn delete-btn" onclick="deleteLocation(${loc.id}, '${loc.locations}')">DELETE</button></td>
+    `;
+    fragment.appendChild(tr);
+  });
+
+  // Single DOM swap — replaces old rows all at once with no flash
+  tableBody.innerHTML = "";
+  tableBody.appendChild(fragment);
+
+  renderPaginationControls();
+}
+
+function renderPaginationControls() {
+  const totalPages = Math.ceil(allLocations.length / LOCATIONS_PER_PAGE);
+
+  // Remove old controls if any
+  const existing = document.getElementById('loc-pagination');
+  if (existing) existing.remove();
+
+  if (totalPages <= 1) return; // No pagination needed
+
+  const container = document.createElement('div');
+  container.id = 'loc-pagination';
+  container.style.cssText = 'display:flex; justify-content:flex-end; align-items:center; gap:8px; padding:12px 20px;';
+
+  for (let i = 1; i <= totalPages; i++) {
+    const btn = document.createElement('button');
+    btn.textContent = i;
+    btn.className = 'filter-btn' + (i === currentPage ? ' active' : '');
+    btn.onclick = () => {
+      currentPage = i;
+      renderLocationPage(currentPage);
+    };
+    container.appendChild(btn);
+  }
+
+  // Append below the table
+  document.querySelector('.sensor-card').appendChild(container);
+}
+
+
+window.setActiveLocation = async function(id, name) {
+    // 1. Update current_config via direct fetch (Supabase JS client has auth issues in module scope)
+    const res = await fetch(
+        `${SUPABASE_URL}/rest/v1/current_config?id=eq.1`,
+        {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                "apikey": SUPABASE_KEY,
+                "Authorization": `Bearer ${SUPABASE_KEY}`
+            },
+            body: JSON.stringify({ active_location_id: id })
+        }
+    );
+
+    if (!res.ok) {
+        const errText = await res.text();
+        console.error("Error syncing to DB:", res.status, errText);
+        alert("Failed to sync location to database.");
+        return;
+    }
+
+    // 2. Keep the local UI updated
+    localStorage.setItem('activeLocationId', id);
+    localStorage.setItem('activeLocationName', name);
+    
+    const gModal = document.getElementById('gatheringModal');
+    const gName = document.getElementById('gatheringLocName');
+    if (gModal && gName) {
+    gName.textContent = name;
+    gModal.style.display = 'flex';
+    loadDashboardData();
+    loadAnalyticsData(); // refresh charts/table for new location
+    }
+};
+
+// --- Modal Logic ---
+const modal = document.getElementById('locationModal');
+const addLocBtn = document.getElementById('addLocBtn'); // Targets your "Add Location" button
+const closeBtn = document.getElementById('closeModal');
+const cancelBtn = document.getElementById('cancelBtn');
+const locationForm = document.getElementById('locationForm');
+
+// Open Modal
+if (addLocBtn){
+  addLocBtn.addEventListener('click', () => {
+    console.log("Modal Opening");
+    modal.style.display = 'flex';
+});
+} else {
+  console.error("Could not find the Add Location");
+}
+
+
+// Close Modal functions
+const hideModal = () => {
+    modal.style.display = 'none';
+    locationForm.reset();
+};
+
+closeBtn.onclick = hideModal;
+cancelBtn.onclick = hideModal;
+
+// --- Save to Supabase ---
+locationForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+  const locations = document.getElementById('locName').value;
+
+  const { error } = await supabase
+    .from('location')
+    .insert([
+      { 
+        locations: locations, 
+        is_active: true 
+      }
+    ]);
+
+    if (error){
+      console.error('Error saving location:', error.message);
+      return;
+    }
+    hideModal();
+
+    const sModal = document.getElementById('successModal');
+    if (sModal) {
+      sModal.style.display = 'flex';
+    }
+    loadDashboardData();
+});
+
+document.getElementById('closeSuccessBtn').onclick = () => {
+  document.getElementById('successModal').style.display = 'none';
+};
+
+const subscribeToSensorUpdates = () => {
+  supabase
+    .channel('sensor-changes')
+    .on(
+      'postgres_changes', 
+      { event: 'INSERT', schema: 'public', table: 'sensors' }, 
+      (payload) => {
+        console.log('New data received!', payload.new);
+        
+        // Refresh the dashboard table (the row with the active ID)
+        loadDashboardData();
+        
+        // Refresh the analytics charts and stats
+        loadAnalyticsData();
+      }
+    )
+    .subscribe();
+};
+
+
+// FORCE the function into the global scope so HTML onclick can find it
+// Single, clean global delete handler
+window.deleteLocation = function(id, name) {
+  const dModal = document.getElementById('deleteModal');
+  const dName = document.getElementById('deleteLocName');
+
+  if (dModal && dName) {
+    dName.textContent = name;
+    dModal.style.setProperty('display', 'flex', 'important'); // open
+  }
+
+  document.getElementById('confirmDelete').onclick = async () => {
+    const { error } = await supabase.from('location').delete().eq('id', id);
+    if (!error) {
+      dModal.style.setProperty('display', 'none', 'important'); // ← fix: use setProperty here too
+      loadDashboardData();
+    } else {
+      console.error('Delete error:', error.message);
+    }
+  };
+
+  document.getElementById('cancelDelete').onclick = () => {
+    dModal.style.setProperty('display', 'none', 'important'); // ← fix: same here
+  };
+};
+
+// Success modal close button
+document.addEventListener("DOMContentLoaded", () => {
+  const closeSuccessBtn = document.getElementById('closeSuccessBtn');
+  if (closeSuccessBtn) {
+    closeSuccessBtn.onclick = () => {
+      document.getElementById('successModal').style.display = 'none';
+    };
+  }
+
+  // ✅ Add this:
+  const closeGatheringBtn = document.getElementById('closeGatheringBtn');
+  if (closeGatheringBtn) {
+    closeGatheringBtn.onclick = () => {
+      document.getElementById('gatheringModal').style.display = 'none';
+    };
+  }
+});
+
+// Delegated listener for location radio buttons
+// Needed because analytics.js is a module — inline onclick can't reach module scope
+document.addEventListener("DOMContentLoaded", () => {
+  const dataTable = document.getElementById('data-table');
+  if (dataTable) {
+    dataTable.addEventListener('change', (e) => {
+      const radio = e.target;
+      if (radio.type === 'radio' && radio.name === 'activeLocation') {
+        const id = Number(radio.dataset.locId);
+        const name = radio.dataset.locName;
+        if (id && name) {
+          window.setActiveLocation(id, name);
+        }
+      }
+    });
+  }
+});
