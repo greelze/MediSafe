@@ -22,12 +22,17 @@ const baseOptions = {
   plugins: { legend: { display: false } },
   scales: {
     x: { 
+      title: {
+        display: true,
+        text: 'Recent Minutes',
+        font: { size: 14, weight: 'bold' }
+      },
       ticks: { 
         font: { size: 12, weight: '500' }, 
-        color: "#000",      // Darker font
+        color: "#000",      
         maxRotation: 0, 
         minRotation: 0,
-        autoSkip: false,    // Show all 10
+        autoSkip: false,    
         maxTicksLimit: 10,
         padding: 8
       }, 
@@ -58,37 +63,79 @@ function formatDateTimeLabel(val) {
 const tempChart = new Chart(document.getElementById("tempChart"), {
   type: "line",
   data: { labels: [], datasets: [{ 
+    label: 'Temperature (°C)',
     data: [], borderColor: "red", tension: 0.3, pointRadius: 6,
     pointBackgroundColor: (ctx) => isTempCritical(ctx.raw) ? "#F77F00" : "white",
     pointBorderColor: (ctx) => isTempCritical(ctx.raw) ? "#A4161A" : "red",
     pointBorderWidth: 2,
     segment: { borderColor: (ctx) => getSegmentColor(ctx, "red", isTempCritical) }
   }]},
-  options: baseOptions
+  options: {
+    ...baseOptions,
+    scales: {
+      ...baseOptions.scales,
+      y: {
+        ...baseOptions.scales.y,
+        title: {
+          display: true,
+          text: 'Temperature (°C)',
+          font: { size: 14, weight: 'bold' }
+        }
+      }
+    }
+  }
 });
 
 const humidityChart = new Chart(document.getElementById("humidityChart"), {
   type: "line",
   data: { labels: [], datasets: [{ 
+    label: 'Humidity (%)',
     data: [], borderColor: "blue", tension: 0.3, pointRadius: 6,
     pointBackgroundColor: (ctx) => isHumidCritical(ctx.raw) ? "#A4161A" : "white",
     pointBorderColor: (ctx) => isHumidCritical(ctx.raw) ? "#A4161A" : "blue",
     pointBorderWidth: 2,
     segment: { borderColor: (ctx) => getSegmentColor(ctx, "blue", isHumidCritical) }
   }]},
-  options: baseOptions
+  options: {
+    ...baseOptions,
+    scales: {
+      ...baseOptions.scales,
+      y: {
+        ...baseOptions.scales.y,
+        title: {
+          display: true,
+          text: 'Humidity (%)',
+          font: { size: 14, weight: 'bold' }
+        }
+      }
+    }
+  }
 });
 
 const uvChart = new Chart(document.getElementById("uvChart"), {
   type: "line",
   data: { labels: [], datasets: [{ 
+    label: 'UV Index',
     data: [], borderColor: "#EAB308", tension: 0.3, pointRadius: 6,
     pointBackgroundColor: (ctx) => isUVCritical(ctx.raw) ? "#A4161A" : "white",
     pointBorderColor: (ctx) => isUVCritical(ctx.raw) ? "#A4161A" : "#EAB308",
     pointBorderWidth: 2,
     segment: { borderColor: (ctx) => getSegmentColor(ctx, "#EAB308", isUVCritical) }
   }]},
-  options: baseOptions
+  options: {
+    ...baseOptions,
+    scales: {
+      ...baseOptions.scales,
+      y: {
+        ...baseOptions.scales.y,
+        title: {
+          display: true,
+          text: 'UV Index',
+          font: { size: 14, weight: 'bold' }
+        }
+      }
+    }
+  }
 });
 
 function updateMetricCards(row) {
