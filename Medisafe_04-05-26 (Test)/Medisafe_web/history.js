@@ -8,8 +8,24 @@ const TABLE_NAME = "sensors";
 
 // Pagination state
 const ROWS_PER_PAGE = 7;
-let allData     = [];
+let allData         = [];   // current (possibly filtered) dataset used for rendering
+let _unfilteredData = [];   // always holds the full Supabase dataset — used to restore after filter reset
 let currentPage = 1;
+
+// ── Shared date parser — handles Supabase timestamptz format ─
+// Supabase returns: "2026-04-01 23:06:08.883131+08"
+// The "+08" offset (no ":00") causes parse failures in some browsers.
+// Fix: space → T, then pad "+08" → "+08:00"
+function parseEntryDate(val) {
+  if (!val) return null;
+  if (typeof val === 'number') return new Date(val);
+  if (typeof val === 'string') {
+    const normalized = val.replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00');
+    const d = new Date(normalized);
+    return isNaN(d) ? null : d;
+  }
+  return null;
+}
 
 // ── UV Index helpers ─────────────────────────────────────────
 
@@ -55,8 +71,8 @@ function renderPage(page) {
   pageData.forEach(entry => {
     let date = '—', time = '—';
     if (entry.recorded_id) {
-      const dateObj = new Date(entry.recorded_id);
-      if (!isNaN(dateObj)) {
+      const dateObj = parseEntryDate(entry.recorded_id);
+      if (dateObj) {
         date = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         time = dateObj.toLocaleTimeString('en-US', { hour12: false });
       }
@@ -145,8 +161,8 @@ export async function loadHistory() {
     // Supabase caps queries at 1,000 rows by default.
     // Page through in batches of 1,000 until all rows are fetched.
     const PAGE_SIZE = 1000;
-    let allRows  = [];
-    let from     = 0;
+    let allRows   = [];
+    let from      = 0;
     let keepGoing = true;
 
     while (keepGoing) {
@@ -162,7 +178,7 @@ export async function loadHistory() {
       allRows = allRows.concat(batch);
 
       if (batch.length < PAGE_SIZE) {
-        keepGoing = false; // last page — we're done
+        keepGoing = false;
       } else {
         from += PAGE_SIZE;
       }
@@ -170,7 +186,8 @@ export async function loadHistory() {
 
     console.log(`History: loaded ${allRows.length} total rows.`);
 
-    allData = allRows;
+    allData         = allRows;
+    _unfilteredData = [...allRows];
     renderPage(1);
     updateStatBoxes(allData);
 
@@ -371,7 +388,7 @@ document.getElementById('filterModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('filterModal')) closeFilterModal();
 });
 
-// Reset filter
+// Reset filter — restores the full unfiltered dataset and re-renders
 document.getElementById('resetFilterBtn')?.addEventListener('click', () => {
   _activeFilterFrom = null;
   _activeFilterTo   = null;
@@ -383,8 +400,10 @@ document.getElementById('resetFilterBtn')?.addEventListener('click', () => {
   });
   updateActiveBanner();
 
-  // Show all rows
-  document.querySelectorAll('#historyTableBody tr').forEach(r => r.style.display = '');
+  // Restore full dataset and re-render from page 1
+  allData = [..._unfilteredData];
+  renderPage(1);
+  updateStatBoxes(allData);
   closeFilterModal();
 
   // Update filter button appearance
@@ -412,8 +431,8 @@ document.getElementById('applyFilterBtn')?.addEventListener('click', () => {
   }
   if (!valid) return;
 
-  // Ensure from <= to
-  if (new Date(fromVal) > new Date(toVal)) {
+  // Ensure from <= to (parse as local time to avoid UTC offset issues)
+  if (new Date(fromVal + 'T00:00:00') > new Date(toVal + 'T00:00:00')) {
     document.getElementById('fg-filter-from')?.classList.add('has-error');
     document.getElementById('fg-filter-to')?.classList.add('has-error');
     return;
@@ -422,21 +441,22 @@ document.getElementById('applyFilterBtn')?.addEventListener('click', () => {
   _activeFilterFrom = fromVal;
   _activeFilterTo   = toVal;
 
-  const fromDate = new Date(fromVal);
-  fromDate.setHours(0, 0, 0, 0);
-  const toDate = new Date(toVal);
-  toDate.setHours(23, 59, 59, 999);
+  // Parse date picker values as LOCAL time using numeric constructor
+  // to avoid UTC-offset shift bugs (e.g. UTC+8 making Apr 8 become Apr 7)
+  const [fy, fm, fd] = fromVal.split('-').map(Number);
+  const [ty, tm, td] = toVal.split('-').map(Number);
+  const fromDate = new Date(fy, fm - 1, fd, 0, 0, 0, 0);
+  const toDate   = new Date(ty, tm - 1, td, 23, 59, 59, 999);
 
-  // Filter visible rows in the table
-  document.querySelectorAll('#historyTableBody tr').forEach(row => {
-    if (row.cells.length <= 1) { row.style.display = ''; return; }
-    const dateText = row.cells[0]?.querySelector('.date-badge')?.textContent.trim() || '';
-    const timeText = row.cells[1]?.textContent.trim() || '';
-    const rowDate  = new Date(`${dateText} ${timeText}`);
-    if (isNaN(rowDate)) { row.style.display = ''; return; }
-    row.style.display = (rowDate >= fromDate && rowDate <= toDate) ? '' : 'none';
+  // Filter _unfilteredData by date range, re-assign allData so
+  // renderPage() and pagination use the filtered set
+  allData = _unfilteredData.filter(entry => {
+    const d = parseEntryDate(entry.recorded_id);
+    return d && d >= fromDate && d <= toDate;
   });
 
+  renderPage(1);
+  updateStatBoxes(allData);
   updateActiveBanner();
 
   // Mark filter button as active
@@ -501,53 +521,44 @@ document.getElementById('confirmExportBtn')?.addEventListener('click', () => {
   else exportCSV(range);
 });
 
-// ── Collect export data by range from allData ─────────────────
+// ── Collect export data by range ─────────────────────────────
 
 function getExportData(range) {
   let source = allData;
 
   if (range === '1month' || range === '2months' || range === '3months') {
-    const days  = range === '1month' ? 30 : range === '2months' ? 60 : 90;
+    const days   = range === '1month' ? 30 : range === '2months' ? 60 : 90;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
     cutoff.setHours(0, 0, 0, 0);
-    source = allData.filter(entry => {
-      if (!entry.recorded_id) return false;
-      return new Date(entry.recorded_id) >= cutoff;
+    source = _unfilteredData.filter(entry => {
+      const d = parseEntryDate(entry.recorded_id);
+      return d && d >= cutoff;
     });
-  }
-  // 'alltime' → use full allData
-  // 'current' → use only the currently rendered page rows
-
-  if (range === 'current') {
-    return Array.from(document.querySelectorAll('#historyTableBody tr'))
-      .filter(r => r.cells.length > 1)
-      .map(r => ({
-        date:     r.cells[0]?.querySelector('.date-badge')?.textContent.trim() || '—',
-        time:     r.cells[1]?.textContent.trim() || '—',
-        temp:     r.cells[2]?.textContent.trim() || '—',
-        humidity: r.cells[3]?.textContent.trim() || '—',
-        uv:       r.cells[4]?.textContent.trim() || '—',
-        status:   r.cells[5]?.querySelector('.status-badge')?.textContent.trim() || '—',
-      }));
+  } else if (range === 'alltime') {
+    source = _unfilteredData;
+  } else if (range === 'current') {
+    // Export only the 7 rows currently visible on the page
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    const end   = start + ROWS_PER_PAGE;
+    source = allData.slice(start, end);
   }
 
-  // Convert allData rows to same flat format
+  // Convert to flat export format
   return source.map(entry => {
     let date = '—', time = '—';
     if (entry.recorded_id) {
-      const dateObj = new Date(entry.recorded_id);
-      if (!isNaN(dateObj)) {
+      const dateObj = parseEntryDate(entry.recorded_id);
+      if (dateObj) {
         date = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         time = dateObj.toLocaleTimeString('en-US', { hour12: false });
       }
     }
-    const temp  = entry.temperature != null ? parseFloat(entry.temperature).toFixed(1) + '°C' : '—';
-    const humid = entry.humidity     != null ? parseFloat(entry.humidity).toFixed(1)    + '%'  : '—';
-    const uv    = entry.uv_index     != null ? parseFloat(entry.uv_index).toFixed(1)           : '—';
-    const t     = entry.temperature != null ? parseFloat(entry.temperature) : 0;
-    const h     = entry.humidity     != null ? parseFloat(entry.humidity)    : 0;
-    const uvRaw = entry.uv_index     != null ? parseFloat(entry.uv_index)    : null;
+    const temp   = entry.temperature != null ? parseFloat(entry.temperature).toFixed(1) + '°C' : '—';
+    const humid  = entry.humidity     != null ? parseFloat(entry.humidity).toFixed(1)    + '%'  : '—';
+    const uv     = entry.uv_index     != null ? parseFloat(entry.uv_index).toFixed(1)           : '—';
+    const t      = entry.temperature != null ? parseFloat(entry.temperature) : 0;
+    const h      = entry.humidity     != null ? parseFloat(entry.humidity)    : 0;
     const status = getStatusLabel(t, h);
     return { date, time, temp, humidity: humid, uv, status };
   });
@@ -590,22 +601,6 @@ function exportPDF(range = 'current') {
   };
   const periodLabel = rangeLabelMap[range] || 'Current Page';
 
-  const tempAlerts  = data.filter(r => r.status.toLowerCase().includes('temp')  && r.status.toLowerCase() !== 'normal').length;
-  const humidAlerts = data.filter(r => r.status.toLowerCase().includes('humid') && r.status.toLowerCase() !== 'normal').length;
-  // UV alerts: uv value > 5  (stored as plain number string like "7.8")
-  const uvAlerts    = data.filter(r => {
-    const v = parseFloat(r.uv);
-    return !isNaN(v) && v > 5;
-  }).length;
-  // Normal = rows with no temp, humid OR uv alert
-  const normals = data.filter(r => {
-    const sl = r.status.toLowerCase();
-    const hasTempHumid = sl !== 'normal' && (sl.includes('temp') || sl.includes('humid'));
-    const uvVal = parseFloat(r.uv);
-    const hasUV = !isNaN(uvVal) && uvVal > 5;
-    return !hasTempHumid && !hasUV;
-  }).length;
-
   const tableRowsHTML = data.map((r, i) => {
     const sl = r.status.toLowerCase();
     const statusCls = sl === 'normal'             ? 'status-normal'
@@ -644,16 +639,6 @@ function exportPDF(range = 'current') {
     .rpt-meta strong { display:inline-block; width:130px; color:#444; }
     .rpt-sec     { font-size:15px; font-weight:700; color:#111; margin-bottom:12px;
                    border-bottom:1px solid #eee; padding-bottom:6px; }
-    .rpt-stats   { width:100%; border-collapse:separate; border-spacing:10px 0; margin-bottom:28px; table-layout:fixed; }
-    .rpt-stat    { width:20%; height:90px; background:#f9f9f9; border:1px solid #eee;
-                   border-radius:8px; padding:14px 16px; vertical-align:bottom; }
-    .rpt-stat-lbl { font-size:10px; color:#888; text-transform:uppercase; letter-spacing:.4px;
-                    line-height:1.4; display:block; margin-bottom:8px; }
-    .rpt-stat-val { font-size:26px; font-weight:700; line-height:1; display:block; }
-    .red    { color:#FF0531; }
-    .amber  { color:#f59e0b; }
-    .orange { color:#f97316; }
-    .green  { color:#059669; }
     table  { width:100%; border-collapse:collapse; font-size:11px; }
     thead tr { background:#FF0531; color:#fff; }
     thead th { padding:9px 10px; text-align:left; font-weight:600; font-size:10.5px;
@@ -681,16 +666,6 @@ function exportPDF(range = 'current') {
     <div><strong>Period:</strong> ${periodLabel}</div>
     <div><strong>Generated By:</strong> MediSafe System</div>
   </div>
-  <div class="rpt-sec">Summary Statistics</div>
-  <table class="rpt-stats">
-    <tr>
-      <td class="rpt-stat"><span class="rpt-stat-lbl">Total Records</span><span class="rpt-stat-val red">${data.length}</span></td>
-      <td class="rpt-stat"><span class="rpt-stat-lbl">Temperature<br/>Alerts</span><span class="rpt-stat-val red">${tempAlerts}</span></td>
-      <td class="rpt-stat"><span class="rpt-stat-lbl">Humidity Alerts</span><span class="rpt-stat-val amber">${humidAlerts}</span></td>
-      <td class="rpt-stat"><span class="rpt-stat-lbl">UV Alerts</span><span class="rpt-stat-val orange">${uvAlerts}</span></td>
-      <td class="rpt-stat"><span class="rpt-stat-lbl">Normal Readings</span><span class="rpt-stat-val green">${normals}</span></td>
-    </tr>
-  </table>
   <div class="rpt-sec">Detailed History Report</div>
   <table>
     <thead>
@@ -705,18 +680,22 @@ function exportPDF(range = 'current') {
 </body>
 </html>`;
 
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:0;height:0;border:0;';
-  document.body.appendChild(iframe);
-  iframe.contentDocument.open();
-  iframe.contentDocument.write(html);
-  iframe.contentDocument.close();
-  iframe.onload = () => {
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => document.body.removeChild(iframe), 1000);
-    }, 300);
+  // Open as Blob URL in new tab and trigger print dialog
+  const blob = new Blob([html], { type: 'text/html' });
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if (!win) {
+    alert('Pop-up blocked. Please allow pop-ups to export PDF.');
+    URL.revokeObjectURL(url);
+    return;
+  }
+  win.onload = () => {
+    win.focus();
+    win.print();
+    win.onafterprint = () => {
+      win.close();
+      URL.revokeObjectURL(url);
+    };
   };
 }
 
