@@ -145,6 +145,130 @@
     .filter-cancel-btn:hover { background: #f3f4f6; }
     .filter-apply-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 22px; border: none; border-radius: 8px; background: #3b82f6; color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: background 0.2s; }
     .filter-apply-btn:hover { background: #2563eb; }
+
+    /* ═══════════════════════════════════════════════
+       PRINT STYLES - PROFESSIONAL PDF REPORT LAYOUT
+    ═══════════════════════════════════════════════ */
+    @media print {
+      /* Hide everything except print template */
+      body > *:not(#printTemplate) { display: none !important; }
+      #printTemplate { display: block !important; position: absolute !important; inset: 0 !important; }
+      
+      /* Page setup */
+      @page {
+        margin: 0.5in !important;
+        size: Letter !important; /* or A4 */
+        @bottom-center { content: "Page " counter(page) " • MediSafe Monitoring Log"; }
+      }
+      
+      /* Typography & spacing */
+      .print-container {
+        font-family: "Segoe UI", Arial, sans-serif !important;
+        font-size: 10.5pt !important;
+        line-height: 1.45 !important;
+        color: #1a1a1a !important;
+        max-width: 8.5in !important;
+        margin: 0 auto !important;
+      }
+      
+      /* Header - Logo + Title */
+      .print-header {
+        display: flex !important;
+        align-items: flex-start !important;
+        gap: 16px !important;
+        margin-bottom: 24px !important;
+        padding-bottom: 16px !important;
+        border-bottom: 4px solid #FF0531 !important;
+      }
+      .print-logo { 
+        font-size: 36px !important; 
+        line-height: 1 !important;
+        flex-shrink: 0 !important;
+      }
+      .print-title { 
+        font-size: 26px !important; 
+        font-weight: 700 !important; 
+        margin: 0 !important; 
+        line-height: 1.2 !important;
+        color: #111 !important;
+      }
+      .print-subtitle { 
+        font-size: 12pt !important; 
+        color: #666 !important; 
+        margin-top: 4px !important; 
+        font-weight: 500 !important;
+      }
+      
+      /* Report metadata */
+      .print-meta { 
+        background: linear-gradient(90deg, #fff8f8 0%, #fef2f2 100%) !important;
+        border-left: 5px solid #FF0531 !important; 
+        padding: 16px 20px !important; 
+        margin-bottom: 24px !important;
+        border-radius: 0 8px 8px 0 !important;
+      }
+      .print-meta div { 
+        display: block !important;
+        margin-bottom: 8px !important; 
+        font-size: 11pt !important;
+        font-weight: 500 !important;
+      }
+      .print-meta div:last-child { margin-bottom: 0 !important; }
+      
+      /* Section title */
+      .print-section-title { 
+        font-size: 18px !important; 
+        font-weight: 700 !important; 
+        margin: 0 0 16px 0 !important; 
+        padding-bottom: 8px !important; 
+        border-bottom: 2px solid #e5e7eb !important;
+        color: #111 !important;
+      }
+      
+      /* Data table */
+      .print-table { 
+        width: 100% !important; 
+        border-collapse: collapse !important; 
+        margin-bottom: 40px !important;
+        font-size: 10pt !important;
+      }
+      .print-table th { 
+        background: #FF0531 !important; 
+        color: #fff !important; 
+        padding: 12px 14px !important; 
+        font-weight: 700 !important; 
+        font-size: 9pt !important; 
+        text-transform: uppercase !important; 
+        letter-spacing: 0.5px !important;
+        text-align: left !important;
+        border-bottom: 3px solid #cc0427 !important;
+      }
+      .print-table td { 
+        padding: 11px 14px !important; 
+        border-bottom: 1px solid #e5e7eb !important; 
+        vertical-align: top !important;
+      }
+      .print-table tr:nth-child(even) td { 
+        background: #fdfdfd !important; 
+      }
+      .print-table tr:hover td { background: #f8f9fa !important; }
+      
+      /* Footer */
+      .print-footer {
+        text-align: center !important;
+        font-size: 9pt !important;
+        color: #888 !important;
+        margin-top: 32px !important;
+        padding-top: 16px !important;
+        border-top: 2px solid #e5e7eb !important;
+      }
+      .print-footer hr { 
+        border: none !important; 
+        height: 1px !important; 
+        background: #e5e7eb !important; 
+        margin: 16px 0 !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -448,16 +572,65 @@ if (format === 'pdf') monitoringExportPDF(range); else monitoringExportCSV(range
 
 function monitoringExportPDF(range) {
   const data = monitoringGetExportRows(range);
-  const now  = new Date();
-  const reportDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  const reportTime = now.toLocaleTimeString('en-US', { hour12: true });
-  const rangeLabels = { current:'Current Page','1month':'Last 1 Month','2months':'Last 2 Months','3months':'Last 3 Months (Recommended)',alltime:'All Time' };
-  const rowsHtml = data.map((r, i) => `<tr style="background:${i%2===0?'#fff':'#fafafa'};"><td>${r.user}</td><td>${r.date}</td><td>${r.time}</td><td>${r.temperature}</td><td>${r.humidity}</td><td>${r.uv}</td><td>${r.notes}</td></tr>`).join('');
+  const now = new Date();
+  
+  // Populate print template with current data
+  document.getElementById('printMetaReportDate').textContent = `Report Date: ${now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+  document.getElementById('printMetaPeriod').textContent = `Period: ${rangeLabels[range] || range}`;
+  document.getElementById('printMetaRecords').textContent = `Records: ${data.length}`;
+  document.getElementById('printMetaGenerated').textContent = `Generated: ${now.toLocaleTimeString('en-US', { hour12: true })}`;
+  
+  // Build table headers and rows
+  const thead = document.getElementById('printTableHead');
+  thead.innerHTML = '<tr><th>User</th><th>Date</th><th>Time</th><th>Temperature</th><th>Humidity</th><th>UV Index</th><th>Notes</th></tr>';
+  
+  const tbody = document.getElementById('printTableBody');
+  tbody.innerHTML = data.map((r, i) => 
+    `<tr style="background:${i%2===0?'#fff':'#fafafa'}">
+      <td>${r.user}</td><td>${r.date}</td><td>${r.time}</td><td>${r.temperature}</td><td>${r.humidity}</td><td>${r.uv}</td><td>${r.notes}</td>
+    </tr>`
+  ).join('');
+  
+  // Small delay ensures DOM updates before print
+  setTimeout(() => window.print(), 100);
+}
 
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>MediSafe Monitoring Log Report</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;padding:32px;}.rpt-header{display:flex;align-items:center;gap:16px;margin-bottom:6px;}.rpt-logo{width:48px;height:48px;background:#FF0531;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;font-size:24px;}.rpt-title{font-size:22px;font-weight:700;color:#111;}.rpt-sub{font-size:13px;color:#666;margin-top:2px;}hr{border:none;border-top:2px solid #FF0531;margin:14px 0 18px;}.rpt-meta{background:#f9f9f9;border-left:4px solid #FF0531;padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:24px;font-size:12px;line-height:2;}.rpt-meta strong{display:inline-block;width:130px;color:#444;}.rpt-sec{font-size:15px;font-weight:700;color:#111;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:6px;}table{width:100%;border-collapse:collapse;font-size:11px;}thead tr{background:#FF0531;color:#fff;}th{padding:9px 10px;text-align:left;font-weight:600;font-size:10.5px;text-transform:uppercase;}td{padding:8px 10px;border-bottom:1px solid #f0f0f0;color:#333;}.rpt-footer{margin-top:32px;text-align:center;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px;}</style></head><body><div class="rpt-header"><div class="rpt-logo">🏥</div><div><div class="rpt-title">MediSafe Monitoring Log Report</div><div class="rpt-sub">Your Hospital Name</div></div></div><hr/><div class="rpt-meta"><div><strong>Report Date:</strong> ${reportDate}</div><div><strong>Time Generated:</strong> ${reportTime}</div><div><strong>Period:</strong> ${rangeLabels[range] || range}</div><div><strong>Generated By:</strong> MediSafe System</div></div><div class="rpt-sec">Monitoring Log Report</div><table><thead><tr><th>User</th><th>Date</th><th>Time</th><th>Temperature</th><th>Humidity</th><th>UV Index</th><th>Notes</th></tr></thead><tbody>${rowsHtml}</tbody></table><div class="rpt-footer">MediSafe System — Monitoring Log Report — ${reportDate} at ${reportTime}</div></body></html>`;
-  const a = document.createElement('a');
-window.print();
-}
-  </script>
+  const rangeLabels = { 
+    current:'Current Page', '1month':'Last 1 Month', '2months':'Last 2 Months', 
+    '3months':'Last 3 Months (Recommended)', alltime:'All Time' 
+  };
+</script>
+
+<!-- PRINT TEMPLATE - HIDDEN PDF REPORT STRUCTURE -->
+<div id="printTemplate" style="display: none;">
+  <div class="print-container">
+    <div class="print-header">
+      <div class="print-brand">
+        <div class="print-logo">🏥</div>
+        <div>
+          <h1 class="print-title">MediSafe Monitoring Log Report</h1>
+          <p class="print-subtitle">Comprehensive Temperature • Humidity • UV Index Monitoring</p>
+        </div>
+      </div>
+    </div>
+    <div class="print-meta">
+      <div id="printMetaReportDate"></div>
+      <div id="printMetaPeriod"></div>
+      <div id="printMetaRecords"></div>
+      <div id="printMetaGenerated"></div>
+    </div>
+    <h2 class="print-section-title">Status Log Records</h2>
+    <table class="print-table">
+      <thead id="printTableHead"></thead>
+      <tbody id="printTableBody"></tbody>
+    </table>
+    <footer class="print-footer">
+      <hr>
+      <p>MediSafe Hospital Monitoring System • Generated on <span id="printFooterDate"></span></p>
+    </footer>
+  </div>
+</div>
+
 </body>
 </html>
