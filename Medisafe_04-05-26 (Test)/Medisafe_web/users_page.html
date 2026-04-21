@@ -66,8 +66,12 @@
       <div class="header">
         <span id="page-title">Users</span>
         <div class="header-actions">
+          <button class="filter-btn" id="filterUsersBtn">
+            <span>👥</span>
+            <span>Filter</span>
+          </button>
           <button class="export-btn" id="exportUsersBtn">
-            <span>📥</span><span>Export CSV</span>
+            <span>📥</span><span>Export</span>
           </button>
         </div>
       </div>
@@ -179,6 +183,163 @@
       <div class="confirm-modal-actions">
         <button class="btn-secondary" id="confirmCancel">Cancel</button>
         <button class="btn-danger" id="confirmOk">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Filter Modal -->
+  <div class="modal-overlay" id="filterModal">
+    <div class="modal-box filter-modal-box">
+      <div class="modal-header">
+        <h3>👥 Filter Users</h3>
+        <button class="modal-close" id="closeFilterModal" title="Close">✕</button>
+      </div>
+
+      <!-- Quick Presets -->
+      <div class="filter-preset-label">Quick Presets</div>
+      <div class="filter-preset-group">
+        <button class="filter-preset-btn" data-preset="today">Today</button>
+        <button class="filter-preset-btn" data-preset="7days">Last 7 Days</button>
+        <button class="filter-preset-btn" data-preset="30days">Last 30 Days</button>
+        <button class="filter-preset-btn" data-preset="custom">Custom Range</button>
+      </div>
+
+      <!-- Custom Date Inputs -->
+      <div class="filter-date-grid" id="filterDateGrid">
+        <div class="form-group" id="fg-filter-from">
+          <label for="filterFromDate">From Date</label>
+          <input type="date" id="filterFromDate" />
+          <span class="field-error">Please select a from date.</span>
+        </div>
+        <div class="form-group" id="fg-filter-to">
+          <label for="filterToDate">To Date</label>
+          <input type="date" id="filterToDate" />
+          <span class="field-error">Please select a to date.</span>
+        </div>
+      </div>
+
+      <!-- Active Filter Banner -->
+      <div class="filter-active-banner" id="filterActiveBanner" style="display:none;">
+        <span class="filter-active-icon">🔍</span>
+        <span id="filterActiveSummary"></span>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-cancel" id="resetFilterBtn">Reset</button>
+        <button class="btn-filter-apply" id="applyFilterBtn">
+          <span>👥</span> Apply Filter
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ Export Report Modal -->
+  <div class="modal-overlay" id="exportModal">
+    <div class="modal-box export-modal-box">
+      <div class="modal-header">
+        <h3>📥 Export Users Report</h3>
+        <button class="modal-close" id="closeExportModal" title="Close">✕</button>
+      </div>
+
+      <!-- Landscape two-column body -->
+      <div class="export-modal-body">
+
+        <!-- LEFT COLUMN: info + format -->
+        <div class="export-col export-col-left">
+
+          <div class="export-preview-info">
+            <div class="export-info-row">
+              <span class="export-info-icon">👥</span>
+              <div>
+                <div class="export-info-label">Report Type</div>
+                <div class="export-info-value">Users Report</div>
+              </div>
+            </div>
+            <div class="export-info-row">
+              <span class="export-info-icon">📅</span>
+              <div>
+                <div class="export-info-label">Report Date</div>
+                <div class="export-info-value" id="exportDateDisplay"></div>
+              </div>
+            </div>
+            <div class="export-info-row">
+              <span class="export-info-icon">📊</span>
+              <div>
+                <div class="export-info-label">Records Included</div>
+                <div class="export-info-value" id="exportRecordCount"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="export-format-label">Choose Format</div>
+          <div class="export-format-group">
+            <label class="export-format-card">
+              <input type="radio" name="exportFormat" value="pdf" checked>
+              <div class="export-format-inner">
+                <span class="export-format-icon">📄</span>
+                <span class="export-format-name">PDF</span>
+                <span class="export-format-desc">Printable report</span>
+              </div>
+            </label>
+            <label class="export-format-card">
+              <input type="radio" name="exportFormat" value="csv">
+              <div class="export-format-inner">
+                <span class="export-format-icon">📊</span>
+                <span class="export-format-name">CSV</span>
+                <span class="export-format-desc">Spreadsheet data</span>
+              </div>
+            </label>
+          </div>
+
+        </div><!-- /export-col-left -->
+
+        <!-- RIGHT COLUMN: log range -->
+        <div class="export-col export-col-right">
+
+          <div class="export-format-label">User Range</div>
+          <div class="export-range-group">
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="current" checked>
+              <div class="export-range-inner">
+                <span class="export-range-icon">📄</span>
+                <span class="export-range-name">Current Page</span>
+                <span class="export-range-desc">Visible records</span>
+              </div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="pending">
+              <div class="export-range-inner">
+                <span class="export-range-icon">⏳</span>
+                <span class="export-range-name">Pending Only</span>
+                <span class="export-range-desc">Unapproved users</span>
+              </div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="approved">
+              <div class="export-range-inner">
+                <span class="export-range-icon">✅</span>
+                <span class="export-range-name">Approved Only</span>
+                <span class="export-range-desc">Approved users</span>
+              </div>
+            </label>
+            <label class="export-range-card recommended">
+              <input type="radio" name="exportRange" value="all">
+              <div class="export-range-inner">
+                <span class="export-range-icon">👥</span>
+                <span class="export-range-name">All Users</span>
+                <span class="export-range-desc">Complete list · Recommended</span>
+              </div>
+            </label>
+          </div>
+
+        </div><!-- /export-col-right -->
+
+      </div><!-- /export-modal-body -->
+
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelExportBtn">Cancel</button>
+        <button class="btn-export-confirm" id="confirmExportBtn"> Export Now
+        </button>
       </div>
     </div>
   </div>
