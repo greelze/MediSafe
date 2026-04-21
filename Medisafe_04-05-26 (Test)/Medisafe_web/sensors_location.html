@@ -13,6 +13,93 @@
   <link rel="stylesheet" href="theme.css">
   <link rel="stylesheet" href="dashboard_page.css">
 
+  <style>
+    .header { display:flex; align-items:center; justify-content:space-between; }
+    .header-actions { display:flex; align-items:center; gap:10px; }
+    .export-btn { display:inline-flex; align-items:center; gap:6px; padding:8px 18px; background:#FF0531; color:#fff; border:none; border-radius:8px; font-size:.875rem; font-weight:600; cursor:pointer; }
+
+    /* ── Date-range filter button (own class to avoid collision with .filter-btn used for pagination) ── */
+    .date-filter-btn {
+      display:inline-flex; align-items:center; gap:6px;
+      padding:8px 18px; border-radius:8px;
+      background:#f3f4f6; color:#374151; border:1.5px solid #e5e7eb;
+      font-size:.875rem; font-weight:600; cursor:pointer; transition:background .2s;
+    }
+    .date-filter-btn:hover { background:#e5e7eb; }
+    .date-filter-btn.filter-active { background:#eff6ff; color:#1d4ed8; border-color:#93c5fd; }
+
+    .filter-active-banner {
+      display:none; align-items:center; gap:8px;
+      background:#eff6ff; border:1px solid #93c5fd; border-radius:8px;
+      padding:8px 14px; margin:12px 28px 0;
+      font-size:.82rem; font-weight:600; color:#1d4ed8;
+    }
+    .filter-active-banner button {
+      margin-left:auto; background:none; border:none;
+      color:#1d4ed8; font-size:.8rem; font-weight:700; cursor:pointer; padding:0 4px;
+    }
+    .filter-active-banner button:hover { text-decoration:underline; }
+
+    /* ── Date-range Filter Modal ── */
+    .filter-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+    .filter-modal-overlay.active { display:flex; }
+    .filter-modal-box { background:#fff; border-radius:16px; padding:28px 32px 24px; width:480px; max-width:94vw; box-shadow:0 8px 40px rgba(0,0,0,.18); position:relative; }
+    .filter-modal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+    .filter-modal-header h3 { font-size:1.1rem; font-weight:700; color:#111; margin:0; }
+    .filter-modal-close { background:none; border:none; font-size:1.2rem; color:#888; cursor:pointer; }
+    .filter-modal-close:hover { color:#333; }
+    .filter-preset-label { font-size:.72rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+    .filter-preset-group { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px; }
+    .filter-preset-btn { padding:6px 14px; border:1.5px solid #e5e7eb; border-radius:20px; background:#f9fafb; font-size:.8rem; font-weight:600; color:#374151; cursor:pointer; transition:all .15s; }
+    .filter-preset-btn:hover { background:#f3f4f6; border-color:#d1d5db; }
+    .filter-preset-btn.active { background:#eff6ff; border-color:#3b82f6; color:#1d4ed8; }
+    .filter-date-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }
+    .filter-form-group { display:flex; flex-direction:column; gap:5px; }
+    .filter-form-group label { font-size:.78rem; font-weight:600; color:#374151; }
+    .filter-form-group input[type="date"] { padding:9px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:.875rem; color:#111; background:#fff; outline:none; transition:border-color .15s; }
+    .filter-form-group input[type="date"]:focus { border-color:#3b82f6; }
+    .filter-form-group.has-error input[type="date"] { border-color:#ef4444; }
+    .field-error { font-size:.72rem; color:#ef4444; display:none; }
+    .filter-form-group.has-error .field-error { display:block; }
+    .filter-banner-inside { display:none; align-items:center; gap:8px; background:#eff6ff; border:1px solid #93c5fd; border-radius:8px; padding:8px 14px; margin-bottom:16px; font-size:.8rem; font-weight:600; color:#1d4ed8; }
+    .filter-modal-footer { display:flex; justify-content:flex-end; gap:10px; padding-top:16px; border-top:1px solid #f0f0f0; }
+    .filter-cancel-btn { padding:9px 22px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; font-size:.9rem; font-weight:500; color:#374151; cursor:pointer; }
+    .filter-cancel-btn:hover { background:#f3f4f6; }
+    .filter-apply-btn { display:inline-flex; align-items:center; gap:6px; padding:9px 22px; border:none; border-radius:8px; background:#3b82f6; color:#fff; font-size:.9rem; font-weight:700; cursor:pointer; transition:background .2s; }
+    .filter-apply-btn:hover { background:#2563eb; }
+    .export-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:1000; align-items:center; justify-content:center; }
+    .export-modal-overlay.active { display:flex; }
+    .export-modal-box { background:#fff; border-radius:16px; padding:28px 32px 24px; width:720px; max-width:94vw; box-shadow:0 8px 40px rgba(0,0,0,.18); position:relative; }
+    .export-modal-header { display:flex; align-items:center; gap:10px; margin-bottom:20px; }
+    .export-modal-header h3 { font-size:1.15rem; font-weight:700; color:#111; margin:0; }
+    .export-modal-close { position:absolute; top:18px; right:20px; background:none; border:none; font-size:1.2rem; color:#888; cursor:pointer; line-height:1; }
+    .export-modal-body { display:flex; gap:28px; align-items:flex-start; }
+    .export-col-left { flex:0 0 260px; border-right:1px solid #e5e7eb; padding-right:28px; }
+    .export-col-right { flex:1; }
+    .export-info-block { background:#f9fafb; border:1px solid #e5e7eb; border-radius:10px; padding:14px 16px; margin-bottom:16px; }
+    .export-info-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:10px; }
+    .export-info-row:last-child { margin-bottom:0; }
+    .export-info-label { font-size:.7rem; font-weight:600; color:#9ca3af; text-transform:uppercase; letter-spacing:.04em; margin-bottom:1px; }
+    .export-info-value { font-size:.88rem; font-weight:600; color:#111; }
+    .export-security-note { background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #f59e0b; border-radius:8px; padding:10px 14px; margin-bottom:16px; font-size:.8rem; color:#92400e; line-height:1.55; }
+    .export-section-label { font-size:.72rem; font-weight:700; color:#9ca3af; text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+    .export-format-group { display:flex; gap:10px; }
+    .export-format-card, .export-range-card { cursor:pointer; }
+    .export-format-card input[type="radio"], .export-range-card input[type="radio"] { display:none; }
+    .export-format-inner { display:flex; flex-direction:column; align-items:center; gap:6px; padding:14px 20px; border:2px solid #e5e7eb; border-radius:10px; background:#f9fafb; min-width:100px; }
+    .export-format-card input:checked + .export-format-inner { border-color:#FF0531; background:rgba(255,5,49,.05); }
+    .export-range-group { display:flex; flex-direction:column; gap:8px; }
+    .export-range-inner { display:flex; align-items:center; padding:11px 16px; border:2px solid #e5e7eb; border-radius:10px; background:#f9fafb; }
+    .export-range-card input:checked + .export-range-inner { border-color:#FF0531; background:rgba(255,5,49,.04); }
+    .export-range-card.recommended .export-range-inner { border-color:#10b981; background:rgba(16,185,129,.05); }
+    .export-range-card.recommended input:checked + .export-range-inner { border-color:#059669; background:rgba(5,150,105,.09); }
+    .export-range-name { flex:1; font-size:.88rem; font-weight:600; color:#111; }
+    .export-range-desc { font-size:.75rem; color:#6b7280; }
+    .export-modal-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:24px; padding-top:16px; border-top:1px solid #f0f0f0; }
+    .export-btn-cancel { padding:9px 22px; border:1px solid #e5e7eb; border-radius:8px; background:#fff; font-size:.9rem; font-weight:500; color:#374151; cursor:pointer; }
+    .export-btn-confirm { padding:9px 22px; border:none; border-radius:8px; background:#FF0531; color:#fff; font-size:.9rem; font-weight:700; cursor:pointer; }
+  </style>
+
 </head>
 <body>
   <div class="app-container">
@@ -48,8 +135,8 @@
           <span class="nav-text">Monitoring Log</span>
         </a>
         <a href="users_page.html" class="nav-item">
-          <span class="nav-icon">👥</span>
-          <span class="nav-text">Users</span>
+            <span class="nav-icon">👥</span>
+            <span class="nav-text">Users</span>
         </a>
         <a href="settings_page.html" class="nav-item">
           <span class="nav-icon">⚙️</span>
@@ -71,6 +158,19 @@
     <div class="main-content">
       <div class="header">
         <span id="page-title">Sensor Locations</span>
+        <div class="header-actions">
+          <button class="date-filter-btn" id="openFilterBtn">
+            <span>📅</span><span>Filter</span>
+          </button>
+          <button class="export-btn" id="exportSensorsBtn"><span>📥</span><span>Export</span></button>
+        </div>
+      </div>
+
+      <!-- Active date-range filter banner -->
+      <div class="filter-active-banner" id="filterActiveBanner">
+        <span>🔍</span>
+        <span id="filterActiveSummary"></span>
+        <button id="clearFilterInlineBanner">✕ Clear Filter</button>
       </div>
 
         <div class="loc-buttons">
@@ -160,6 +260,88 @@
       <p style="color: #4b5563;">Gathering data for <strong id="gatheringLocName"></strong>...</p>
       <div style="margin-top: 20px;">
         <button id="closeGatheringBtn" class="btn-secondary" style="width: 100%;">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Report Modal -->
+  <div class="export-modal-overlay" id="exportModal">
+    <div class="export-modal-box">
+      <div class="export-modal-header">
+        <span style="font-size:1.3rem;">📥</span><h3>Export Report</h3>
+        <button class="export-modal-close" id="closeExportModal" title="Close">✕</button>
+      </div>
+      <div class="export-modal-body">
+        <div class="export-col-left">
+          <div class="export-info-block">
+            <div class="export-info-row"><span>🏥</span><div><div class="export-info-label">Report Type</div><div class="export-info-value">Sensor Locations Report</div></div></div>
+            <div class="export-info-row"><span>📅</span><div><div class="export-info-label">Report Date</div><div class="export-info-value" id="exportDateDisplay"></div></div></div>
+            <div class="export-info-row"><span>📊</span><div><div class="export-info-label">Records Included</div><div class="export-info-value" id="exportRecordCount"></div></div></div>
+          </div>
+          <div class="export-security-note"><strong>Data Security Recommendation</strong>For compliance and audit purposes, it is recommended to retain and export at least <strong>3 months</strong> of sensor logs regularly.</div>
+          <div class="export-section-label">Choose Format</div>
+          <div class="export-format-group">
+            <label class="export-format-card"><input type="radio" name="exportFormat" value="pdf" checked><div class="export-format-inner"><span>📄</span><span><strong>PDF</strong></span><span>Printable report</span></div></label>
+            <label class="export-format-card"><input type="radio" name="exportFormat" value="csv"><div class="export-format-inner"><span>📊</span><span><strong>CSV</strong></span><span>Spreadsheet data</span></div></label>
+          </div>
+        </div>
+        <div class="export-col-right">
+          <div class="export-section-label">Log Range</div>
+          <div class="export-range-group">
+            <label class="export-range-card"><input type="radio" name="exportRange" value="current" checked><div class="export-range-inner"><span class="export-range-name">Current Page</span><span class="export-range-desc">Visible records</span></div></label>
+            <label class="export-range-card"><input type="radio" name="exportRange" value="1month"><div class="export-range-inner"><span class="export-range-name">1 Month</span><span class="export-range-desc">Last 30 days</span></div></label>
+            <label class="export-range-card"><input type="radio" name="exportRange" value="2months"><div class="export-range-inner"><span class="export-range-name">2 Months</span><span class="export-range-desc">Last 60 days</span></div></label>
+            <label class="export-range-card recommended"><input type="radio" name="exportRange" value="3months"><div class="export-range-inner"><span class="export-range-name">3 Months</span><span class="export-range-desc">Recommended · 90 days</span></div></label>
+            <label class="export-range-card"><input type="radio" name="exportRange" value="alltime"><div class="export-range-inner"><span class="export-range-name">All Time</span><span class="export-range-desc">Complete history</span></div></label>
+          </div>
+        </div>
+      </div>
+      <div class="export-modal-footer">
+        <button class="export-btn-cancel" id="cancelExportBtn">Cancel</button>
+        <button class="export-btn-confirm" id="confirmExportBtn">Export Now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Filter Modal (date range) ── -->
+  <div class="filter-modal-overlay" id="filterModal">
+    <div class="filter-modal-box">
+      <div class="filter-modal-header">
+        <h3>📅 Filter by Date Range</h3>
+        <button class="filter-modal-close" id="closeFilterModal" title="Close">✕</button>
+      </div>
+
+      <div class="filter-preset-label">Quick Presets</div>
+      <div class="filter-preset-group">
+        <button class="filter-preset-btn" data-preset="today">Today</button>
+        <button class="filter-preset-btn" data-preset="7days">Last 7 Days</button>
+        <button class="filter-preset-btn" data-preset="30days">Last 30 Days</button>
+        <button class="filter-preset-btn" data-preset="custom">Custom Range</button>
+      </div>
+
+      <div class="filter-date-grid">
+        <div class="filter-form-group" id="fg-filter-from">
+          <label for="filterFromDate">From Date</label>
+          <input type="date" id="filterFromDate" />
+          <span class="field-error">Please select a from date.</span>
+        </div>
+        <div class="filter-form-group" id="fg-filter-to">
+          <label for="filterToDate">To Date</label>
+          <input type="date" id="filterToDate" />
+          <span class="field-error">Please select a to date.</span>
+        </div>
+      </div>
+
+      <div class="filter-banner-inside" id="filterBannerInside">
+        <span>🔍</span>
+        <span id="filterBannerInsideText"></span>
+      </div>
+
+      <div class="filter-modal-footer">
+        <button class="filter-cancel-btn" id="resetFilterBtn">Reset</button>
+        <button class="filter-apply-btn" id="applyFilterBtn">
+          <span>📅</span> Apply Filter
+        </button>
       </div>
     </div>
   </div>
