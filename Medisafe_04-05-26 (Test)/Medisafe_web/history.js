@@ -8,14 +8,16 @@ const TABLE_NAME = "sensors";
 
 // Pagination state
 const ROWS_PER_PAGE = 7;
-let allData         = [];   // current (possibly filtered) dataset used for rendering
-let _unfilteredData = [];   // always holds the full Supabase dataset — used to restore after filter reset
+let allData         = [];  // current (possibly filtered) dataset used for rendering
+let _unfilteredData = [];  // always holds the full Supabase dataset — never overwritten after load
 let currentPage = 1;
 
-// ── Shared date parser — handles Supabase timestamptz format ─
-// Supabase returns: "2026-04-01 23:06:08.883131+08"
-// The "+08" offset (no ":00") causes parse failures in some browsers.
-// Fix: space → T, then pad "+08" → "+08:00"
+// ── Shared date parser — handles Supabase timestamptz format ─────────────
+// Supabase timestamptz returns: "2026-04-01 23:06:08.883131+08"
+// Two issues:
+//   1. Space between date and time (not "T") — breaks some browsers
+//   2. "+08" offset without ":00" — invalid ISO 8601 in strict parsers
+// Fix: replace space with T, then pad "+08" → "+08:00"
 function parseEntryDate(val) {
   if (!val) return null;
   if (typeof val === 'number') return new Date(val);
@@ -27,7 +29,7 @@ function parseEntryDate(val) {
   return null;
 }
 
-// ── UV Index helpers ─────────────────────────────────────────
+// ── UV Index helpers ──────────────────────────────────────────────────────
 
 function getUVClass(uv) {
   if (uv == null || isNaN(uv)) return '';
@@ -43,12 +45,11 @@ function getUVLabel(uv) {
   return parseFloat(uv).toFixed(1);
 }
 
-// UV is considered an "alert" when it exceeds moderate (>5)
 function isUVAlert(uv) {
   return uv != null && !isNaN(uv) && parseFloat(uv) > 5;
 }
 
-// ── Render one page of allData into the table ────────────────
+// ── Render one page of allData into the table ─────────────────────────────
 
 function renderPage(page) {
   const tableBody = document.getElementById('historyTableBody');
@@ -97,7 +98,7 @@ function renderPage(page) {
   updateFooter();
 }
 
-// ── Update rows-info text and pagination buttons ─────────────
+// ── Update rows-info text and pagination buttons ──────────────────────────
 
 function updateFooter() {
   const total    = allData.length;
@@ -149,7 +150,7 @@ function updateFooter() {
   pagination.appendChild(nextBtn);
 }
 
-// ── Load history from Supabase ───────────────────────────────
+// ── Load history from Supabase ────────────────────────────────────────────
 
 export async function loadHistory() {
   const container = document.getElementById("historyTableBody");
@@ -187,7 +188,7 @@ export async function loadHistory() {
     console.log(`History: loaded ${allRows.length} total rows.`);
 
     allData         = allRows;
-    _unfilteredData = [...allRows];
+    _unfilteredData = [...allRows]; // pristine copy — never overwritten after this
     renderPage(1);
     updateStatBoxes(allData);
 
@@ -197,7 +198,7 @@ export async function loadHistory() {
   }
 }
 
-// ── Update stat boxes from full Supabase dataset ─────────────
+// ── Update stat boxes ─────────────────────────────────────────────────────
 
 function updateStatBoxes(data) {
   let tempAlerts   = 0;
@@ -218,7 +219,6 @@ function updateStatBoxes(data) {
     if (hasHumidAlert) humidAlerts++;
     if (hasUVAlert)    uvAlerts++;
 
-    // Normal = no alerts in ANY environment
     if (!hasTempAlert && !hasHumidAlert && !hasUVAlert) normals++;
   });
 
@@ -229,7 +229,7 @@ function updateStatBoxes(data) {
   if (el('statNormalReadings'))el('statNormalReadings').textContent = normals;
 }
 
-// ── Helpers ──────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────
 
 function getTempClass(temp) {
   if (temp > 25) return 'high';
@@ -267,7 +267,7 @@ function getStatusLabel(temp, humidity) {
   return 'Normal';
 }
 
-// ── Search functionality ─────────────────────────────────────
+// ── Search functionality ──────────────────────────────────────────────────
 
 const searchInput = document.getElementById('searchInput');
 if (searchInput) {
@@ -281,7 +281,7 @@ if (searchInput) {
   });
 }
 
-// ── Filter button ────────────────────────────────────────────
+// ── Filter button ─────────────────────────────────────────────────────────
 
 const filterBtn = document.querySelector('.filter-btn');
 if (filterBtn) {
@@ -290,7 +290,7 @@ if (filterBtn) {
   });
 }
 
-// ── Filter Modal logic ────────────────────────────────────────
+// ── Filter Modal logic ────────────────────────────────────────────────────
 
 let _activeFilterFrom = null;
 let _activeFilterTo   = null;
@@ -299,11 +299,9 @@ function openFilterModal() {
   const modal = document.getElementById('filterModal');
   if (!modal) return;
 
-  // Restore previously selected dates if any
   if (_activeFilterFrom) document.getElementById('filterFromDate').value = _activeFilterFrom;
   if (_activeFilterTo)   document.getElementById('filterToDate').value   = _activeFilterTo;
 
-  // Show active banner if filter is set
   updateActiveBanner();
   modal.classList.add('active');
 }
@@ -336,17 +334,15 @@ function formatDisplayDate(isoStr) {
 }
 
 function setPresetDates(preset) {
-  const today  = new Date();
-  const pad    = n => String(n).padStart(2, '0');
-  const toISO  = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const today    = new Date();
+  const pad      = n => String(n).padStart(2, '0');
+  const toISO    = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   const todayISO = toISO(today);
 
-  // Clear errors
   ['fg-filter-from','fg-filter-to'].forEach(id => {
     document.getElementById(id)?.classList.remove('has-error');
   });
 
-  // Highlight active preset btn
   document.querySelectorAll('.filter-preset-btn').forEach(b => b.classList.remove('active'));
   document.querySelector(`[data-preset="${preset}"]`)?.classList.add('active');
 
@@ -388,7 +384,7 @@ document.getElementById('filterModal')?.addEventListener('click', (e) => {
   if (e.target === document.getElementById('filterModal')) closeFilterModal();
 });
 
-// Reset filter — restores the full unfiltered dataset and re-renders
+// Reset filter
 document.getElementById('resetFilterBtn')?.addEventListener('click', () => {
   _activeFilterFrom = null;
   _activeFilterTo   = null;
@@ -400,13 +396,12 @@ document.getElementById('resetFilterBtn')?.addEventListener('click', () => {
   });
   updateActiveBanner();
 
-  // Restore full dataset and re-render from page 1
+  // Restore pristine full dataset and re-render
   allData = [..._unfilteredData];
   renderPage(1);
   updateStatBoxes(allData);
   closeFilterModal();
 
-  // Update filter button appearance
   const fb = document.querySelector('.filter-btn');
   if (fb) fb.classList.remove('filter-active');
 });
@@ -431,7 +426,7 @@ document.getElementById('applyFilterBtn')?.addEventListener('click', () => {
   }
   if (!valid) return;
 
-  // Ensure from <= to (parse as local time to avoid UTC offset issues)
+  // Ensure from <= to
   if (new Date(fromVal + 'T00:00:00') > new Date(toVal + 'T00:00:00')) {
     document.getElementById('fg-filter-from')?.classList.add('has-error');
     document.getElementById('fg-filter-to')?.classList.add('has-error');
@@ -441,15 +436,17 @@ document.getElementById('applyFilterBtn')?.addEventListener('click', () => {
   _activeFilterFrom = fromVal;
   _activeFilterTo   = toVal;
 
-  // Parse date picker values as LOCAL time using numeric constructor
-  // to avoid UTC-offset shift bugs (e.g. UTC+8 making Apr 8 become Apr 7)
+  // Parse date picker values as LOCAL time using numeric constructor.
+  // new Date("YYYY-MM-DD") parses as UTC midnight — in UTC+8 that shifts
+  // the date backwards by 8 hours (e.g. Apr 8 becomes Apr 7 at 16:00 local).
+  // Using new Date(year, month-1, day) always gives local midnight. ✅
   const [fy, fm, fd] = fromVal.split('-').map(Number);
   const [ty, tm, td] = toVal.split('-').map(Number);
   const fromDate = new Date(fy, fm - 1, fd, 0, 0, 0, 0);
   const toDate   = new Date(ty, tm - 1, td, 23, 59, 59, 999);
 
-  // Filter _unfilteredData by date range, re-assign allData so
-  // renderPage() and pagination use the filtered set
+  // Always filter from _unfilteredData (full pristine dataset),
+  // not allData which may already be a filtered subset.
   allData = _unfilteredData.filter(entry => {
     const d = parseEntryDate(entry.recorded_id);
     return d && d >= fromDate && d <= toDate;
@@ -459,14 +456,13 @@ document.getElementById('applyFilterBtn')?.addEventListener('click', () => {
   updateStatBoxes(allData);
   updateActiveBanner();
 
-  // Mark filter button as active
   const fb = document.querySelector('.filter-btn');
   if (fb) fb.classList.add('filter-active');
 
   closeFilterModal();
 });
 
-// ── Export button ────────────────────────────────────────────
+// ── Export button ─────────────────────────────────────────────────────────
 
 const exportBtn = document.querySelector('.export-btn');
 if (exportBtn) {
@@ -475,7 +471,7 @@ if (exportBtn) {
   });
 }
 
-// ── Export Modal logic ────────────────────────────────────────
+// ── Export Modal logic ────────────────────────────────────────────────────
 
 function openExportModal() {
   const modal = document.getElementById('exportModal');
@@ -485,7 +481,6 @@ function openExportModal() {
   document.getElementById('exportDateDisplay').textContent =
     now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 
-  // Update record count preview whenever range changes
   function refreshCount() {
     const range = document.querySelector('input[name="exportRange"]:checked')?.value || 'current';
     const rows  = getExportData(range);
@@ -521,12 +516,19 @@ document.getElementById('confirmExportBtn')?.addEventListener('click', () => {
   else exportCSV(range);
 });
 
-// ── Collect export data by range ─────────────────────────────
+// ── Collect export data by range ──────────────────────────────────────────
 
 function getExportData(range) {
-  let source = allData;
+  let source;
 
-  if (range === '1month' || range === '2months' || range === '3months') {
+  if (range === 'current') {
+    // Export only the 7 rows visible on the current page
+    const start = (currentPage - 1) * ROWS_PER_PAGE;
+    const end   = start + ROWS_PER_PAGE;
+    source = allData.slice(start, end);
+
+  } else if (range === '1month' || range === '2months' || range === '3months') {
+    // Always use _unfilteredData so month ranges work even when a date filter is active
     const days   = range === '1month' ? 30 : range === '2months' ? 60 : 90;
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
@@ -535,16 +537,12 @@ function getExportData(range) {
       const d = parseEntryDate(entry.recorded_id);
       return d && d >= cutoff;
     });
-  } else if (range === 'alltime') {
+
+  } else {
+    // alltime — always export everything
     source = _unfilteredData;
-  } else if (range === 'current') {
-    // Export only the 7 rows currently visible on the page
-    const start = (currentPage - 1) * ROWS_PER_PAGE;
-    const end   = start + ROWS_PER_PAGE;
-    source = allData.slice(start, end);
   }
 
-  // Convert to flat export format
   return source.map(entry => {
     let date = '—', time = '—';
     if (entry.recorded_id) {
@@ -564,7 +562,7 @@ function getExportData(range) {
   });
 }
 
-// ── CSV Export ────────────────────────────────────────────────
+// ── CSV Export ────────────────────────────────────────────────────────────
 
 function exportCSV(range = 'current') {
   const data    = getExportData(range);
@@ -584,7 +582,7 @@ function exportCSV(range = 'current') {
   URL.revokeObjectURL(url);
 }
 
-// ── PDF Export ────────────────────────────────────────────────
+// ── PDF Export ────────────────────────────────────────────────────────────
 
 function exportPDF(range = 'current') {
   const data       = getExportData(range);
@@ -699,7 +697,7 @@ function exportPDF(range = 'current') {
   };
 }
 
-// ── Auto-load on page load ───────────────────────────────────
+// ── Auto-load on page load ────────────────────────────────────────────────
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', loadHistory);
