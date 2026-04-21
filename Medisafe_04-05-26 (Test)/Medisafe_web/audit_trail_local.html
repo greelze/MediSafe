@@ -7,6 +7,152 @@
     <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="audit_trail_local.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+      /* ── Export button — matches History page style ── */
+      .header-actions .export-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        background: #FF0531;
+        color: #fff;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .header-actions .export-btn:hover { background: #cc0427; }
+
+      /* ── Filter button (matches History / Monitoring style) ── */
+      .header-actions .filter-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        padding: 8px 18px; border-radius: 8px;
+        background: #f3f4f6; color: #374151; border: 1.5px solid #e5e7eb;
+        font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background .2s;
+      }
+      .header-actions .filter-btn:hover { background: #e5e7eb; }
+      .header-actions .filter-btn.filter-active { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
+
+      /* ── Active filter banner (below header) ── */
+      .filter-active-banner {
+        display: none; align-items: center; gap: 8px;
+        background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px;
+        padding: 8px 14px; margin: 12px 28px 0;
+        font-size: 0.82rem; font-weight: 600; color: #1d4ed8;
+      }
+      .filter-active-banner button {
+        margin-left: auto; background: none; border: none;
+        color: #1d4ed8; font-size: .8rem; font-weight: 700; cursor: pointer; padding: 0 4px;
+      }
+      .filter-active-banner button:hover { text-decoration: underline; }
+
+      /* ── Filter Modal (date range) ── */
+      .filter-modal-overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.45); z-index: 1000;
+        align-items: center; justify-content: center;
+      }
+      .filter-modal-overlay.active { display: flex; }
+      .filter-modal-box {
+        background: #fff; border-radius: 16px; padding: 28px 32px 24px;
+        width: 480px; max-width: 94vw;
+        box-shadow: 0 8px 40px rgba(0,0,0,.18); position: relative;
+      }
+      .filter-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+      .filter-modal-header h3 { font-size: 1.1rem; font-weight: 700; color: #111; margin: 0; }
+      .filter-modal-close { background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer; }
+      .filter-modal-close:hover { color: #333; }
+      .filter-preset-label { font-size: .72rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+      .filter-preset-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+      .filter-preset-btn {
+        padding: 6px 14px; border: 1.5px solid #e5e7eb; border-radius: 20px;
+        background: #f9fafb; font-size: .8rem; font-weight: 600; color: #374151; cursor: pointer; transition: all .15s;
+      }
+      .filter-preset-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+      .filter-preset-btn.active { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+      .filter-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+      .filter-form-group { display: flex; flex-direction: column; gap: 5px; }
+      .filter-form-group label { font-size: .78rem; font-weight: 600; color: #374151; }
+      .filter-form-group input[type="date"] {
+        padding: 9px 12px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+        font-size: .875rem; color: #111; background: #fff; outline: none; transition: border-color .15s;
+      }
+      .filter-form-group input[type="date"]:focus { border-color: #3b82f6; }
+      .filter-form-group.has-error input[type="date"] { border-color: #ef4444; }
+      .field-error { font-size: .72rem; color: #ef4444; display: none; }
+      .filter-form-group.has-error .field-error { display: block; }
+      .filter-banner-inside {
+        display: none; align-items: center; gap: 8px;
+        background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px;
+        padding: 8px 14px; margin-bottom: 16px;
+        font-size: .8rem; font-weight: 600; color: #1d4ed8;
+      }
+      .filter-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+      .filter-cancel-btn { padding: 9px 22px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: .9rem; font-weight: 500; color: #374151; cursor: pointer; }
+      .filter-cancel-btn:hover { background: #f3f4f6; }
+      .filter-apply-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 22px; border: none; border-radius: 8px; background: #3b82f6; color: #fff; font-size: .9rem; font-weight: 700; cursor: pointer; transition: background .2s; }
+      .filter-apply-btn:hover { background: #2563eb; }
+
+      /* ── Export Modal ── */
+      .export-modal-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.45);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
+      .export-modal-overlay.active { display: flex; }
+
+      .export-modal-box {
+        background: #fff;
+        border-radius: 16px;
+        padding: 28px 32px 24px;
+        width: 720px;
+        max-width: 94vw;
+        box-shadow: 0 8px 40px rgba(0,0,0,.18);
+        position: relative;
+      }
+      .export-modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+      .export-modal-header h3 { font-size: 1.15rem; font-weight: 700; color: #111; margin: 0; }
+      .export-modal-close { position: absolute; top: 18px; right: 20px; background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer; line-height: 1; }
+      .export-modal-close:hover { color: #333; }
+      .export-modal-body { display: flex; gap: 28px; align-items: flex-start; }
+      .export-col-left { flex: 0 0 260px; border-right: 1px solid #e5e7eb; padding-right: 28px; }
+      .export-col-right { flex: 1; }
+      .export-info-block { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+      .export-info-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+      .export-info-row:last-child { margin-bottom: 0; }
+      .export-info-icon { font-size: 1rem; margin-top: 1px; }
+      .export-info-label { font-size: .7rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 1px; }
+      .export-info-value { font-size: .88rem; font-weight: 600; color: #111; }
+      .export-security-note { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: .8rem; color: #92400e; line-height: 1.55; }
+      .export-security-note strong { display: block; font-size: .82rem; margin-bottom: 4px; color: #78350f; }
+      .export-section-label { font-size: .72rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+      .export-format-group { display: flex; gap: 10px; }
+      .export-format-card, .export-range-card { cursor: pointer; }
+      .export-format-card input[type="radio"], .export-range-card input[type="radio"] { display: none; }
+      .export-format-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 20px; border: 2px solid #e5e7eb; border-radius: 10px; background: #f9fafb; min-width: 100px; transition: border-color .2s, background .2s; }
+      .export-format-card input:checked + .export-format-inner { border-color: #FF0531; background: rgba(255,5,49,.05); }
+      .export-format-icon { font-size: 1.5rem; }
+      .export-format-name { font-size: .88rem; font-weight: 700; color: #111; }
+      .export-format-desc { font-size: .7rem; color: #6b7280; }
+      .export-range-group { display: flex; flex-direction: column; gap: 8px; }
+      .export-range-inner { display: flex; align-items: center; padding: 11px 16px; border: 2px solid #e5e7eb; border-radius: 10px; background: #f9fafb; transition: border-color .2s, background .2s; }
+      .export-range-card input:checked + .export-range-inner { border-color: #FF0531; background: rgba(255,5,49,.04); }
+      .export-range-card.recommended .export-range-inner { border-color: #10b981; background: rgba(16,185,129,.05); }
+      .export-range-card.recommended input:checked + .export-range-inner { border-color: #059669; background: rgba(5,150,105,.09); }
+      .export-range-name { flex: 1; font-size: .88rem; font-weight: 600; color: #111; }
+      .export-range-desc { font-size: .75rem; color: #6b7280; }
+      .export-modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+      .export-btn-cancel { padding: 9px 22px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: .9rem; font-weight: 500; color: #374151; cursor: pointer; }
+      .export-btn-cancel:hover { background: #f3f4f6; }
+      .export-btn-confirm { padding: 9px 22px; border: none; border-radius: 8px; background: #FF0531; color: #fff; font-size: .9rem; font-weight: 700; cursor: pointer; }
+      .export-btn-confirm:hover { background: #cc0427; }
+    </style>
 </head>
 <body>
     <div class="app-container">
@@ -19,7 +165,7 @@
                 <a href="dashboard_page.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-text">Home</span></a>
                 <a href="history_page.html"   class="nav-item"><span class="nav-icon">🕒</span><span class="nav-text">Threshold History</span></a>
                 <a href="analytics_page.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-text">Analytics</span></a>
-                <a href="sensors_location.html" class="nav-item "><span class="nav-icon">📍</span><span class="nav-text">Sensor Location</span></a>
+                <a href="sensors_location.html" class="nav-item"><span class="nav-icon">📍</span><span class="nav-text">Sensor Location</span></a>
                 <a href="audit_trail_local.html" class="nav-item active"><span class="nav-icon">📋</span><span class="nav-text">Audit Trail</span></a>
                 <a href="monitoring_log.html" class="nav-item"><span class="nav-icon">🩺</span><span class="nav-text">Monitoring Log</span></a>
                 <a href="users_page.html" class="nav-item"><span class="nav-icon">👥</span><span class="nav-text">Users</span></a>
@@ -35,10 +181,20 @@
             <div class="header">
                 <span id="page-title">Audit Trail</span>
                 <div class="header-actions">
+                    <button class="filter-btn" id="openFilterBtn">
+                        <span>📅</span><span>Filter</span>
+                    </button>
                     <button class="export-btn" id="export-btn">
-                        <span>📥</span><span>Export CSV</span>
+                        <span>📥</span><span>Export</span>
                     </button>
                 </div>
+            </div>
+
+            <!-- Active date-range filter banner -->
+            <div class="filter-active-banner" id="filterActiveBanner">
+                <span>🔍</span>
+                <span id="filterActiveSummary"></span>
+                <button id="clearFilterInlineBanner">✕ Clear Filter</button>
             </div>
 
             <div class="filter-section">
@@ -47,7 +203,7 @@
                     <select class="filter-select" id="month-filter" title="Select a month">
                         <option value="all">All Months</option>
                         <option value="0">January</option>
-                        <option value="1" selected>February</option>
+                        <option value="1">February</option>
                         <option value="2">March</option>
                         <option value="3">April</option>
                         <option value="4">May</option>
@@ -105,91 +261,83 @@
         </div>
     </div>
 
-    <!-- Report Modal -->
+    <!-- ============================================================
+         Report Modal
+         FIX: All divs are now properly opened and closed.
+         modal-top, modal-card, and modal-overlay all have their
+         matching closing tags before the next modal begins.
+    ============================================================ -->
     <div class="modal-overlay" id="report-modal">
         <div class="modal-card">
             <div class="modal-top">
                 <div>
-                <button class="modal-close" id="modal-close">✕</button>
-            </div>
-
-            <div class="form-row">
-                <div class="form-group no-mb">
-                    <label class="form-label">Date</label>
-                    <input type="date" class="form-input" id="report-date">
+                    <button class="modal-close" id="modal-close">✕</button>
                 </div>
-                <div class="form-group no-mb">
-                    <label class="form-label">Time</label>
-                    <input type="time" class="form-input" id="report-time">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Pharmacy on Duty / Name</label>
-                <input type="text" class="form-input" id="report-name" placeholder="e.g. Dr. Maria Santos">
-            </div>
-
-            <div class="form-divider"></div>
-
-            <div class="form-group no-mb">
-                <label class="form-label">Signature</label>
-                <div class="sig-tabs">
-                    <button class="sig-tab active" data-panel="text">✍️ Enter Name</button>
-                    <button class="sig-tab" data-panel="draw">🖊️ Draw</button>
-                    <button class="sig-tab" data-panel="upload">📎 Upload</button>
-                </div>
-
-                <!-- Text Signature Panel -->
-                <div class="sig-panel active" id="panel-text">
-                    <input type="text" class="form-input" id="sig-text-input" placeholder="Type your full name here" style="font-family: 'Brush Script MT', cursive; font-size: 24px; text-align: center;">
-                    <div style="text-align: center; margin-top: 8px; font-size: 12px; color: var(--text-muted);">
-                        Your name will appear as a digital signature
+                <div class="form-row">
+                    <div class="form-group no-mb">
+                        <label class="form-label">Date</label>
+                        <input type="date" class="form-input" id="report-date">
+                    </div>
+                    <div class="form-group no-mb">
+                        <label class="form-label">Time</label>
+                        <input type="time" class="form-input" id="report-time">
                     </div>
                 </div>
-
-                <!-- Draw Panel -->
-                <div class="sig-panel" id="panel-draw">
-                    <div class="sig-canvas-wrap">
-                        <canvas id="sig-canvas"></canvas>
-                        <div class="sig-canvas-hint" id="canvas-hint">
-                            <span>✍️</span><span>Sign here</span>
+                <div class="form-group">
+                    <label class="form-label">Pharmacy on Duty / Name</label>
+                    <input type="text" class="form-input" id="report-name" placeholder="e.g. Dr. Maria Santos">
+                </div>
+                <div class="form-divider"></div>
+                <div class="form-group no-mb">
+                    <label class="form-label">Signature</label>
+                    <div class="sig-tabs">
+                        <button class="sig-tab active" data-panel="text">✍️ Enter Name</button>
+                        <button class="sig-tab" data-panel="draw">🖊️ Draw</button>
+                        <button class="sig-tab" data-panel="upload">📎 Upload</button>
+                    </div>
+                    <div class="sig-panel active" id="panel-text">
+                        <input type="text" class="form-input" id="sig-text-input" placeholder="Type your full name here" style="font-family: 'Brush Script MT', cursive; font-size: 24px; text-align: center;">
+                        <div style="text-align: center; margin-top: 8px; font-size: 12px; color: var(--text-muted);">Your name will appear as a digital signature</div>
+                    </div>
+                    <div class="sig-panel" id="panel-draw">
+                        <div class="sig-canvas-wrap">
+                            <canvas id="sig-canvas"></canvas>
+                            <div class="sig-canvas-hint" id="canvas-hint"><span>✍️</span><span>Sign here</span></div>
+                        </div>
+                        <div class="sig-row"><button class="sig-clear-btn" id="sig-clear">Clear</button></div>
+                    </div>
+                    <div class="sig-panel" id="panel-upload">
+                        <div class="sig-upload-area" id="upload-area">
+                            <input type="file" id="sig-file-input" accept="image/*">
+                            <div class="sig-upload-icon">🖼️</div>
+                            <div class="sig-upload-text">Click to upload or drag & drop</div>
+                            <div class="sig-upload-hint">PNG, JPG, SVG (max 2 MB)</div>
+                        </div>
+                        <div class="sig-preview" id="sig-preview">
+                            <img id="sig-preview-img" src="" alt="Signature preview">
+                            <button class="sig-remove-btn" id="sig-remove">✕ Remove</button>
                         </div>
                     </div>
-                    <div class="sig-row">
-                        <button class="sig-clear-btn" id="sig-clear">Clear</button>
-                    </div>
+                </div><!-- /form-group -->
+                <div class="modal-footer">
+                    <button class="btn-cancel" id="modal-cancel">Cancel</button>
+                    <button class="btn-save" id="modal-save">💾 Save Report</button>
                 </div>
+            </div><!-- /modal-top  ← WAS MISSING IN ORIGINAL -->
+        </div><!-- /modal-card  ← WAS MISSING IN ORIGINAL -->
+    </div><!-- /report-modal -->
 
-                <!-- Upload Panel -->
-                <div class="sig-panel" id="panel-upload">
-                    <div class="sig-upload-area" id="upload-area">
-                        <input type="file" id="sig-file-input" accept="image/*">
-                        <div class="sig-upload-icon">🖼️</div>
-                        <div class="sig-upload-text">Click to upload or drag & drop</div>
-                        <div class="sig-upload-hint">PNG, JPG, SVG (max 2 MB)</div>
-                    </div>
-                    <div class="sig-preview" id="sig-preview">
-                        <img id="sig-preview-img" src="" alt="Signature preview">
-                        <button class="sig-remove-btn" id="sig-remove">✕ Remove</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="modal-footer">
-                <button class="btn-cancel" id="modal-cancel">Cancel</button>
-                <button class="btn-save"   id="modal-save">💾 Save Report</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delete Confirmation Modal -->
+    <!-- ============================================================
+         Delete Confirmation Modal
+         FIX: Moved OUTSIDE of report-modal. In the original code,
+         everything after the unclosed modal-top was being swallowed
+         into the report-modal's DOM, including the export modal.
+    ============================================================ -->
     <div class="confirm-overlay" id="confirm-modal">
         <div class="confirm-card">
             <div class="confirm-icon">⚠️</div>
             <div class="confirm-title">Delete Audit Record?</div>
-            <div class="confirm-message">
-                Are you sure you want to delete this record? This action cannot be undone.
-            </div>
+            <div class="confirm-message">Are you sure you want to delete this record? This action cannot be undone.</div>
             <div class="confirm-actions">
                 <button class="btn-confirm-cancel" id="confirm-cancel">Cancel</button>
                 <button class="btn-confirm-delete" id="confirm-delete">Delete</button>
@@ -197,28 +345,140 @@
         </div>
     </div>
 
-    <div id="deleteModal" class="custom-modal" style="display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); align-items: center; justify-content: center;">
-    <div style="background: white; padding: 30px; border-radius: 15px; width: 400px; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">
-        <h3 style="color: #1f2937; margin-bottom: 10px;">Confirm Deletion</h3>
-        <p style="color: #4b5563;">Are you sure you want to delete <br><strong id="deleteLocName" style="color: #111827;"></strong>?</p>
-        <div style="margin-top: 25px; display: flex; justify-content: center; gap: 15px;">
-            <button id="cancelDelete" style="padding: 10px 20px; border-radius: 8px; border: 1px solid #d1d5db; background: #f3f4f6; cursor: pointer; font-weight: 600;">Cancel</button>
-            <button id="confirmDelete" style="padding: 10px 20px; border-radius: 8px; border: none; background: #ef4444; color: white; cursor: pointer; font-weight: 600;">Delete</button>
-        </div>
-    </div>
-    </div>
-
     <!-- Toast Notification -->
     <div class="toast" id="toast">✅ Success!</div>
 
-    <!-- Scripts -->
+    <!-- ============================================================
+         Export Report Modal
+         FIX: Now lives at the TOP LEVEL of <body>, completely outside
+         all other modals. This is why it wasn't appearing — it was
+         trapped inside the unclosed report-modal divs above.
+    ============================================================ -->
+    <div class="export-modal-overlay" id="exportModal">
+      <div class="export-modal-box">
+        <div class="export-modal-header">
+          <span class="export-info-icon">📥</span>
+          <h3>Export Report</h3>
+          <button class="export-modal-close" id="closeExportModal" title="Close">✕</button>
+        </div>
+        <div class="export-modal-body">
+          <div class="export-col-left">
+            <div class="export-info-block">
+              <div class="export-info-row">
+                <span class="export-info-icon">🏥</span>
+                <div><div class="export-info-label">Report Type</div><div class="export-info-value">Audit Trail Report</div></div>
+              </div>
+              <div class="export-info-row">
+                <span class="export-info-icon">📅</span>
+                <div><div class="export-info-label">Report Date</div><div class="export-info-value" id="exportDateDisplay"></div></div>
+              </div>
+              <div class="export-info-row">
+                <span class="export-info-icon">📊</span>
+                <div><div class="export-info-label">Records Included</div><div class="export-info-value" id="exportRecordCount"></div></div>
+              </div>
+            </div>
+            <div class="export-security-note">
+              <strong>Data Security Recommendation</strong>
+              For compliance and audit purposes, it is recommended to retain and export at least <strong>3 months</strong> of sensor logs regularly.
+            </div>
+            <div class="export-section-label">Choose Format</div>
+            <div class="export-format-group">
+              <label class="export-format-card">
+                <input type="radio" name="exportFormat" value="pdf" checked>
+                <div class="export-format-inner">
+                  <span class="export-format-icon">📄</span>
+                  <span class="export-format-name">PDF</span>
+                  <span class="export-format-desc">Printable report</span>
+                </div>
+              </label>
+              <label class="export-format-card">
+                <input type="radio" name="exportFormat" value="csv">
+                <div class="export-format-inner">
+                  <span class="export-format-icon">📊</span>
+                  <span class="export-format-name">CSV</span>
+                  <span class="export-format-desc">Spreadsheet data</span>
+                </div>
+              </label>
+            </div>
+          </div>
+          <div class="export-col-right">
+            <div class="export-section-label">Log Range</div>
+            <div class="export-range-group">
+              <label class="export-range-card">
+                <input type="radio" name="exportRange" value="current" checked>
+                <div class="export-range-inner"><span class="export-range-name">Current Page</span><span class="export-range-desc">Visible records</span></div>
+              </label>
+              <label class="export-range-card">
+                <input type="radio" name="exportRange" value="1month">
+                <div class="export-range-inner"><span class="export-range-name">1 Month</span><span class="export-range-desc">Last 30 days</span></div>
+              </label>
+              <label class="export-range-card">
+                <input type="radio" name="exportRange" value="2months">
+                <div class="export-range-inner"><span class="export-range-name">2 Months</span><span class="export-range-desc">Last 60 days</span></div>
+              </label>
+              <label class="export-range-card recommended">
+                <input type="radio" name="exportRange" value="3months">
+                <div class="export-range-inner"><span class="export-range-name">3 Months</span><span class="export-range-desc">Recommended · 90 days</span></div>
+              </label>
+              <label class="export-range-card">
+                <input type="radio" name="exportRange" value="alltime">
+                <div class="export-range-inner"><span class="export-range-name">All Time</span><span class="export-range-desc">Complete history</span></div>
+              </label>
+            </div>
+          </div>
+        </div>
+        <div class="export-modal-footer">
+          <button class="export-btn-cancel" id="cancelExportBtn">Cancel</button>
+          <button class="export-btn-confirm" id="confirmExportBtn">Export Now</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Filter Modal (date range) ── -->
+    <div class="filter-modal-overlay" id="filterModal">
+      <div class="filter-modal-box">
+        <div class="filter-modal-header">
+          <h3>📅 Filter by Date Range</h3>
+          <button class="filter-modal-close" id="closeFilterModal" title="Close">✕</button>
+        </div>
+
+        <div class="filter-preset-label">Quick Presets</div>
+        <div class="filter-preset-group">
+          <button class="filter-preset-btn" data-preset="today">Today</button>
+          <button class="filter-preset-btn" data-preset="7days">Last 7 Days</button>
+          <button class="filter-preset-btn" data-preset="30days">Last 30 Days</button>
+          <button class="filter-preset-btn" data-preset="custom">Custom Range</button>
+        </div>
+
+        <div class="filter-date-grid">
+          <div class="filter-form-group" id="fg-filter-from">
+            <label for="filterFromDate">From Date</label>
+            <input type="date" id="filterFromDate" />
+            <span class="field-error">Please select a from date.</span>
+          </div>
+          <div class="filter-form-group" id="fg-filter-to">
+            <label for="filterToDate">To Date</label>
+            <input type="date" id="filterToDate" />
+            <span class="field-error">Please select a to date.</span>
+          </div>
+        </div>
+
+        <div class="filter-banner-inside" id="filterBannerInside">
+          <span>🔍</span>
+          <span id="filterBannerInsideText"></span>
+        </div>
+
+        <div class="filter-modal-footer">
+          <button class="filter-cancel-btn" id="resetDateFilterBtn">Reset</button>
+          <button class="filter-apply-btn" id="applyDateFilterBtn">
+            <span>📅</span> Apply Filter
+          </button>
+        </div>
+      </div>
+    </div>
+
     <script src="theme.js"></script>
     <script src="audit_trail_local.js"></script>
-    <script>
-        loadUsers();
-    </script>
-
-
-    <script src="profile_sync.js"></script> 
+    <script src="profile_sync.js"></script>
 </body>
 </html>
