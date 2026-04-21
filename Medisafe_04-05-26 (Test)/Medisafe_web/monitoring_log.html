@@ -1,77 +1,462 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MediSafe - Monitoring Log</title>
-    <link rel="stylesheet" href="theme.css">
-    <link rel="stylesheet" href="monitoring_log.css">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MediSafe - Monitoring Log</title>
+  <link rel="stylesheet" href="theme.css">
+  <link rel="stylesheet" href="monitoring_log.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--border-color, #e5e7eb);
+      background: var(--card-bg, #fff);
+    }
+    #page-title { font-size: 1.5rem; font-weight: 700; color: var(--text-primary, #111); }
+    .header-actions { display: flex; align-items: center; gap: 10px; }
+
+    /* ── Buttons ── */
+    .export-btn, .filter-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 18px; border: none; border-radius: 8px;
+      font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: background 0.2s;
+    }
+    .export-btn { background: #FF0531; color: #fff; }
+    .export-btn:hover { background: #cc0427; }
+    .filter-btn { background: #f3f4f6; color: #374151; border: 1.5px solid #e5e7eb; }
+    .filter-btn:hover { background: #e5e7eb; }
+    .filter-btn.filter-active { background: #eff6ff; color: #1d4ed8; border-color: #93c5fd; }
+
+    /* ── Active filter banner ── */
+    .filter-active-banner {
+      display: none; align-items: center; gap: 8px;
+      background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px;
+      padding: 8px 14px; margin: 12px 28px 0;
+      font-size: 0.82rem; font-weight: 600; color: #1d4ed8;
+    }
+    .filter-active-banner button {
+      margin-left: auto; background: none; border: none;
+      color: #1d4ed8; font-size: 0.8rem; font-weight: 700; cursor: pointer; padding: 0 4px;
+    }
+    .filter-active-banner button:hover { text-decoration: underline; }
+
+    /* ── Export Modal ── */
+    .export-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .export-modal-overlay.active { display: flex; }
+    .export-modal-box {
+      background: #fff; border-radius: 16px; padding: 28px 32px 24px;
+      width: 720px; max-width: 94vw;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18); position: relative;
+    }
+    .export-modal-header { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+    .export-modal-header h3 { font-size: 1.15rem; font-weight: 700; color: #111; margin: 0; }
+    .export-modal-close {
+      position: absolute; top: 18px; right: 20px;
+      background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer;
+    }
+    .export-modal-close:hover { color: #333; }
+    .export-modal-body { display: flex; gap: 28px; align-items: flex-start; }
+    .export-col-left { flex: 0 0 260px; border-right: 1px solid #e5e7eb; padding-right: 28px; }
+    .export-col-right { flex: 1; }
+    .export-info-block { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; }
+    .export-info-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+    .export-info-row:last-child { margin-bottom: 0; }
+    .export-info-icon { font-size: 1rem; margin-top: 1px; }
+    .export-info-label { font-size: 0.7rem; font-weight: 600; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 1px; }
+    .export-info-value { font-size: 0.88rem; font-weight: 600; color: #111; }
+    .export-security-note { background: #fffbeb; border: 1px solid #fde68a; border-left: 4px solid #f59e0b; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.8rem; color: #92400e; line-height: 1.55; }
+    .export-security-note strong { display: block; font-size: 0.82rem; margin-bottom: 4px; color: #78350f; }
+    .export-section-label { font-size: 0.72rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+    .export-format-group { display: flex; gap: 10px; }
+    .export-format-card { cursor: pointer; }
+    .export-format-card input[type="radio"] { display: none; }
+    .export-format-inner { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 20px; border: 2px solid #e5e7eb; border-radius: 10px; background: #f9fafb; transition: border-color 0.2s, background 0.2s; min-width: 100px; }
+    .export-format-card input:checked + .export-format-inner { border-color: #FF0531; background: rgba(255,5,49,0.05); }
+    .export-format-icon { font-size: 1.5rem; }
+    .export-format-name { font-size: 0.88rem; font-weight: 700; color: #111; }
+    .export-format-desc { font-size: 0.7rem; color: #6b7280; }
+    .export-range-group { display: flex; flex-direction: column; gap: 8px; }
+    .export-range-card { cursor: pointer; }
+    .export-range-card input[type="radio"] { display: none; }
+    .export-range-inner { display: flex; align-items: center; padding: 11px 16px; border: 2px solid #e5e7eb; border-radius: 10px; background: #f9fafb; transition: border-color 0.2s, background 0.2s; }
+    .export-range-card input:checked + .export-range-inner { border-color: #FF0531; background: rgba(255,5,49,0.04); }
+    .export-range-card.recommended .export-range-inner { border-color: #10b981; background: rgba(16,185,129,0.05); }
+    .export-range-card.recommended input:checked + .export-range-inner { border-color: #059669; background: rgba(5,150,105,0.09); }
+    .export-range-name { flex: 1; font-size: 0.88rem; font-weight: 600; color: #111; }
+    .export-range-desc { font-size: 0.75rem; color: #6b7280; }
+    .export-modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 24px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+    .export-btn-cancel { padding: 9px 22px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 0.9rem; font-weight: 500; color: #374151; cursor: pointer; }
+    .export-btn-cancel:hover { background: #f3f4f6; }
+    .export-btn-confirm { padding: 9px 22px; border: none; border-radius: 8px; background: #FF0531; color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+    .export-btn-confirm:hover { background: #cc0427; }
+
+    /* ── Filter Modal ── */
+    .filter-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .filter-modal-overlay.active { display: flex; }
+    .filter-modal-box {
+      background: #fff; border-radius: 16px; padding: 28px 32px 24px;
+      width: 480px; max-width: 94vw;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18); position: relative;
+    }
+    .filter-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .filter-modal-header h3 { font-size: 1.1rem; font-weight: 700; color: #111; margin: 0; }
+    .filter-modal-close { background: none; border: none; font-size: 1.2rem; color: #888; cursor: pointer; }
+    .filter-modal-close:hover { color: #333; }
+    .filter-preset-label { font-size: 0.72rem; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+    .filter-preset-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+    .filter-preset-btn {
+      padding: 6px 14px; border: 1.5px solid #e5e7eb; border-radius: 20px;
+      background: #f9fafb; font-size: 0.8rem; font-weight: 600; color: #374151; cursor: pointer; transition: all 0.15s;
+    }
+    .filter-preset-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
+    .filter-preset-btn.active { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+    .filter-date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .filter-form-group { display: flex; flex-direction: column; gap: 5px; }
+    .filter-form-group label { font-size: 0.78rem; font-weight: 600; color: #374151; }
+    .filter-form-group input[type="date"] {
+      padding: 9px 12px; border: 1.5px solid #e5e7eb; border-radius: 8px;
+      font-size: 0.875rem; color: #111; background: #fff; outline: none; transition: border-color 0.15s;
+    }
+    .filter-form-group input[type="date"]:focus { border-color: #3b82f6; }
+    .filter-form-group.has-error input[type="date"] { border-color: #ef4444; }
+    .field-error { font-size: 0.72rem; color: #ef4444; display: none; }
+    .filter-form-group.has-error .field-error { display: block; }
+    .filter-banner-inside {
+      display: none; align-items: center; gap: 8px;
+      background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px;
+      padding: 8px 14px; margin-bottom: 16px;
+      font-size: 0.8rem; font-weight: 600; color: #1d4ed8;
+    }
+    .filter-modal-footer { display: flex; justify-content: flex-end; gap: 10px; padding-top: 16px; border-top: 1px solid #f0f0f0; }
+    .filter-cancel-btn { padding: 9px 22px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 0.9rem; font-weight: 500; color: #374151; cursor: pointer; }
+    .filter-cancel-btn:hover { background: #f3f4f6; }
+    .filter-apply-btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 22px; border: none; border-radius: 8px; background: #3b82f6; color: #fff; font-size: 0.9rem; font-weight: 700; cursor: pointer; transition: background 0.2s; }
+    .filter-apply-btn:hover { background: #2563eb; }
+  </style>
 </head>
 <body>
-    <div class="app-container">
-        <div class="sidebar">
-            <div class="logo-section">
-                <div class="logo">🏥</div>
-                <div class="brand-name">MediSafe</div>
-            </div>
-            <div class="nav-section">
-                <a href="dashboard_page.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-text">Home</span></a>
-                <a href="history_page.html"   class="nav-item"><span class="nav-icon">🕒</span><span class="nav-text">Threshold History</span></a>
-                <a href="analytics_page.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-text">Analytics</span></a>
-                <a href="sensors_location.html" class="nav-item"><span class="nav-icon">📍</span><span class="nav-text">Sensor Locations</span></a>
-                <a href="audit_trail_local.html" class="nav-item"><span class="nav-icon">📋</span><span class="nav-text">Audit Trail</span></a>
-                <a href="monitoring_log.html" class="nav-item active"><span class="nav-icon">🩺</span><span class="nav-text">Monitoring Log</span></a>
-                <a href="users_page.html" class="nav-item"><span class="nav-icon">👥</span><span class="nav-text">Users</span></a>
-                <a href="settings_page.html"  class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-text">Settings</span></a>
-            </div>
-            <div class="profile-section">
-                <a href="profile_page.html" class="profile-link"><div class="avatar-placeholder"></div></a>
-                <a href="login_page.html" class="nav-item logout-item"><span class="nav-icon">🚪</span><span class="nav-text">Logout</span></a>
-            </div>
-        </div>
-
-        <div class="main-content">
-            <div class="header">
-                <span id="page-title">Monitoring Log 🩺</span>
-            </div>
-
-            <div class="monitoring-card">
-                <div class="monitoring-header">
-                    <h2 class="monitoring-title">Latest Status Logs</h2>
-                    <span class="record-count" id="record-count">0 entries</span>
-                </div>
-
-                <div class="monitoring-table-wrapper">
-                    <table class="monitoring-table">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Date</th>
-                                <th>Time</th>
-                                <th>Temperature</th>
-                                <th>Humidity</th>
-                                <th>UV Index</th>
-                                <th>Notes</th>
-                            </tr>
-                        </thead>
-                        <tbody id="monitoring-table-body"></tbody>
-                    </table>
-                </div>
-
-                <div class="pagination" id="pagination"></div>
-
-                <div id="empty-state" class="empty-state" style="display:none;">
-                    <div class="empty-icon">🩺</div>
-                    <div class="empty-text">No status log records yet.</div>
-                </div>
-            </div>
-        </div>
+  <div class="app-container">
+    <div class="sidebar">
+      <div class="logo-section">
+        <div class="logo">🏥</div>
+        <div class="brand-name">MediSafe</div>
+      </div>
+      <div class="nav-section">
+        <a href="dashboard_page.html" class="nav-item"><span class="nav-icon">🏠</span><span class="nav-text">Home</span></a>
+        <a href="history_page.html"   class="nav-item"><span class="nav-icon">🕒</span><span class="nav-text">Threshold History</span></a>
+        <a href="analytics_page.html" class="nav-item"><span class="nav-icon">📊</span><span class="nav-text">Analytics</span></a>
+        <a href="sensors_location.html" class="nav-item"><span class="nav-icon">📍</span><span class="nav-text">Sensor Locations</span></a>
+        <a href="audit_trail_local.html" class="nav-item"><span class="nav-icon">📋</span><span class="nav-text">Audit Trail</span></a>
+        <a href="monitoring_log.html" class="nav-item active"><span class="nav-icon">🩺</span><span class="nav-text">Monitoring Log</span></a>
+        <a href="users_page.html" class="nav-item"><span class="nav-icon">👥</span><span class="nav-text">Users</span></a>
+        <a href="settings_page.html"  class="nav-item"><span class="nav-icon">⚙️</span><span class="nav-text">Settings</span></a>
+      </div>
+      <div class="profile-section">
+        <a href="profile_page.html" class="profile-link"><div class="avatar-placeholder"></div></a>
+        <a href="login_page.html" class="nav-item logout-item"><span class="nav-icon">🚪</span><span class="nav-text">Logout</span></a>
+      </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <div class="main-content">
+      <div class="header">
+        <span id="page-title">Monitoring Log 🩺</span>
+        <div class="header-actions">
+          <!-- Filter button -->
+          <button class="filter-btn" id="openFilterBtn">
+            <span>📅</span><span>Filter</span>
+          </button>
+          <!-- Export button -->
+          <button class="export-btn" id="exportMonitoringBtn" disabled>
+            <span>📥</span><span>Export</span>
+          </button>
+        </div>
+      </div>
 
-    <script src="theme.js"></script>
-    <script src="monitoring_log.js"></script>
-</body>
-</html>
+      <!-- Active filter banner (shown below header when a filter is active) -->
+      <div class="filter-active-banner" id="filterActiveBanner">
+        <span>🔍</span>
+        <span id="filterActiveSummary"></span>
+        <button id="clearFilterInlineBanner">✕ Clear Filter</button>
+      </div>
+
+      <div class="monitoring-card">
+        <div class="monitoring-header">
+          <h2 class="monitoring-title">Latest Status Logs</h2>
+          <span class="record-count" id="record-count">0 entries</span>
+        </div>
+
+        <div class="monitoring-table-wrapper">
+          <table class="monitoring-table">
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Date</th>
+                <th>Time</th>
+                <th>Temperature</th>
+                <th>Humidity</th>
+                <th>UV Index</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="monitoring-table-body"></tbody>
+          </table>
+        </div>
+
+        <div class="pagination" id="pagination"></div>
+
+        <div id="empty-state" class="empty-state" style="display:none;">
+          <div class="empty-icon">🩺</div>
+          <div class="empty-text">No status log records found.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- ── Filter Modal ── -->
+  <div class="filter-modal-overlay" id="filterModal">
+    <div class="filter-modal-box">
+      <div class="filter-modal-header">
+        <h3>📅 Filter by Date Range</h3>
+        <button class="filter-modal-close" id="closeFilterModal" title="Close">✕</button>
+      </div>
+
+      <div class="filter-preset-label">Quick Presets</div>
+      <div class="filter-preset-group">
+        <button class="filter-preset-btn" data-preset="today">Today</button>
+        <button class="filter-preset-btn" data-preset="7days">Last 7 Days</button>
+        <button class="filter-preset-btn" data-preset="30days">Last 30 Days</button>
+        <button class="filter-preset-btn" data-preset="custom">Custom Range</button>
+      </div>
+
+      <div class="filter-date-grid">
+        <div class="filter-form-group" id="fg-filter-from">
+          <label for="filterFromDate">From Date</label>
+          <input type="date" id="filterFromDate" />
+          <span class="field-error">Please select a from date.</span>
+        </div>
+        <div class="filter-form-group" id="fg-filter-to">
+          <label for="filterToDate">To Date</label>
+          <input type="date" id="filterToDate" />
+          <span class="field-error">Please select a to date.</span>
+        </div>
+      </div>
+
+      <!-- Active filter summary inside modal -->
+      <div class="filter-banner-inside" id="filterBannerInside">
+        <span>🔍</span>
+        <span id="filterBannerInsideText"></span>
+      </div>
+
+      <div class="filter-modal-footer">
+        <button class="filter-cancel-btn" id="resetFilterBtn">Reset</button>
+        <button class="filter-apply-btn" id="applyFilterBtn">
+          <span>📅</span> Apply Filter
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Export Modal ── -->
+  <div class="export-modal-overlay" id="exportModal">
+    <div class="export-modal-box">
+      <div class="export-modal-header">
+        <span style="font-size:1.3rem;">📥</span>
+        <h3>Export Report</h3>
+        <button class="export-modal-close" id="closeExportModal" title="Close">✕</button>
+      </div>
+
+      <div class="export-modal-body">
+        <div class="export-col-left">
+          <div class="export-info-block">
+            <div class="export-info-row">
+              <span class="export-info-icon">🏥</span>
+              <div><div class="export-info-label">Report Type</div><div class="export-info-value">Monitoring Log Report</div></div>
+            </div>
+            <div class="export-info-row">
+              <span class="export-info-icon">📅</span>
+              <div><div class="export-info-label">Report Date</div><div class="export-info-value" id="exportDateDisplay"></div></div>
+            </div>
+            <div class="export-info-row">
+              <span class="export-info-icon">📊</span>
+              <div><div class="export-info-label">Records Included</div><div class="export-info-value" id="exportRecordCount"></div></div>
+            </div>
+          </div>
+          <div class="export-security-note">
+            <strong>Data Security Recommendation</strong>
+            For compliance and audit purposes, it is recommended to retain and export at least <strong>3 months</strong> of sensor logs regularly.
+          </div>
+          <div class="export-section-label">Choose Format</div>
+          <div class="export-format-group">
+            <label class="export-format-card">
+              <input type="radio" name="exportFormat" value="pdf" checked>
+              <div class="export-format-inner">
+                <span class="export-format-icon">📄</span>
+                <span class="export-format-name">PDF</span>
+                <span class="export-format-desc">Printable report</span>
+              </div>
+            </label>
+            <label class="export-format-card">
+              <input type="radio" name="exportFormat" value="csv">
+              <div class="export-format-inner">
+                <span class="export-format-icon">📊</span>
+                <span class="export-format-name">CSV</span>
+                <span class="export-format-desc">Spreadsheet data</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <div class="export-col-right">
+          <div class="export-section-label">Log Range</div>
+          <div class="export-range-group">
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="current" checked>
+              <div class="export-range-inner"><span class="export-range-name">Current Page</span><span class="export-range-desc">Visible records</span></div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="1month">
+              <div class="export-range-inner"><span class="export-range-name">1 Month</span><span class="export-range-desc">Last 30 days</span></div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="2months">
+              <div class="export-range-inner"><span class="export-range-name">2 Months</span><span class="export-range-desc">Last 60 days</span></div>
+            </label>
+            <label class="export-range-card recommended">
+              <input type="radio" name="exportRange" value="3months">
+              <div class="export-range-inner"><span class="export-range-name">3 Months</span><span class="export-range-desc">Recommended · 90 days</span></div>
+            </label>
+            <label class="export-range-card">
+              <input type="radio" name="exportRange" value="alltime">
+              <div class="export-range-inner"><span class="export-range-name">All Time</span><span class="export-range-desc">Complete history</span></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="export-modal-footer">
+        <button class="export-btn-cancel" id="cancelExportBtn">Cancel</button>
+        <button class="export-btn-confirm" id="confirmExportBtn">Export Now</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="theme.js"></script>
+  <script src="monitoring_log.js"></script>
+
+  <script>
+    /* ══════════════════════════════════════════
+       EXPORT LOGIC
+    ══════════════════════════════════════════ */
+    function getMonitoringExportBridge() { return window.monitoringExportBridge || {}; }
+
+function showToast(message, type = 'info') {
+  const toast = document.getElementById('toast');
+  if (!toast) return;
+  toast.textContent = message;
+  toast.className = `toast ${type}`;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 4000);
+}
+
+function monitoringGetExportRows(range) {
+      const bridge = getMonitoringExportBridge();
+      if (!bridge.isReady || !bridge.isReady()) {
+        showToast('Data not ready. Please wait for logs to load.', 'error');
+        return [];
+      }
+      return bridge.getExportData ? bridge.getExportData(range) : [];
+    }
+
+    function monitoringRefreshCount() {
+      const range = document.querySelector('input[name="exportRange"]:checked')?.value || 'current';
+      const rows  = monitoringGetExportRows(range);
+      const el    = document.getElementById('exportRecordCount');
+      if (el) el.textContent = `${rows.length} record${rows.length !== 1 ? 's' : ''}`;
+    }
+
+    // Enable export button when ready
+    window.addMonitoringReadyCallback = (callback) => {
+      const checkReady = () => {
+        const bridge = getMonitoringExportBridge();
+        if (bridge.isReady && bridge.isReady()) {
+          callback();
+        } else {
+          setTimeout(checkReady, 200);
+        }
+      };
+      checkReady();
+    };
+
+function openMonitoringExportModal() {
+      const bridge = getMonitoringExportBridge();
+      if (!bridge.isReady || !bridge.isReady()) {
+        showToast('Please wait - loading monitoring data first.', 'error');
+        return;
+      }
+      const modal  = document.getElementById('exportModal');
+      if (!modal) return;
+      const dateEl = document.getElementById('exportDateDisplay');
+      if (dateEl) dateEl.textContent = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      document.querySelectorAll('input[name="exportRange"]').forEach(r => {
+        r.removeEventListener('change', monitoringRefreshCount);
+        r.addEventListener('change', monitoringRefreshCount);
+      });
+      monitoringRefreshCount();
+      modal.classList.add('active');
+    }
+    function closeMonitoringExportModal() { document.getElementById('exportModal')?.classList.remove('active'); }
+    window.openMonitoringExportModal = openMonitoringExportModal;
+
+    document.getElementById('exportMonitoringBtn')?.addEventListener('click', openMonitoringExportModal);
+    document.getElementById('closeExportModal')?.addEventListener('click', closeMonitoringExportModal);
+    document.getElementById('cancelExportBtn')?.addEventListener('click', closeMonitoringExportModal);
+    document.getElementById('exportModal')?.addEventListener('click', e => { if (e.target === document.getElementById('exportModal')) closeMonitoringExportModal(); });
+
+    document.getElementById('confirmExportBtn')?.addEventListener('click', () => {
+      const format = document.querySelector('input[name="exportFormat"]:checked')?.value || 'pdf';
+      const range  = document.querySelector('input[name="exportRange"]:checked')?.value  || 'current';
+      closeMonitoringExportModal();
+      if (format === 'pdf') monitoringExportPDF(range); else monitoringExportCSV(range);
+    });
+
+    function monitoringExportCSV(range) {
+      const data = monitoringGetExportRows(range);
+      const csvRows = [
+        ['User','Date','Time','Temperature','Humidity','UV Index','Notes'].join(','),
+        ...data.map(r => [`"${r.user}"`, r.date, r.time, r.temperature, r.humidity, r.uv, `"${r.notes}"`].join(','))
+      ];
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([csvRows.join('\n')], { type: 'text/csv' }));
+      a.download = `medisafe_monitoring_log_${range}_${Date.now()}.csv`;
+      a.click();
+    }
+
+function monitoringExportPDF(range) {
+      const data = monitoringGetExportRows(range);
+      const now  = new Date();
+      const reportDate = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      const reportTime = now.toLocaleTimeString('en-US', { hour12: true });
+      const rangeLabels = { current:'Current Page','1month':'Last 1 Month','2months':'Last 2 Months','3months':'Last 3 Months (Recommended)',alltime:'All Time' };
+      const rowsHtml = data.map((r, i) => `<tr style="background:${i%2===0?'#fff':'#fafafa'};"><td>${r.user}</td><td>${r.date}</td><td>${r.time}</td><td>${r.temperature}</td><td>${r.humidity}</td><td>${r.uv}</td><td>${r.notes}</td></tr>`).join('');
+      const html = '<!DOCTYPE html><html><head><meta charset="utf-8"/><title>MediSafe Monitoring Log Report</title><style>*{margin:0;padding:0;box-sizing:border-box;}body{font-family:Arial,sans-serif;font-size:12px;padding:32px;}.rpt-header{display:flex;align-items:center;gap:16px;margin-bottom:6px;}.rpt-logo{width:48px;height:48px;background:#FF0531;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;}.rpt-title{font-size:22px;font-weight:700;color:#111;}.rpt-sub{font-size:13px;color:#666;margin-top:2px;}hr{border:none;border-top:2px solid #FF0531;margin:14px 0 18px;}.rpt-meta{background:#f9f9f9;border-left:4px solid #FF0531;padding:12px 16px;border-radius:0 8px 8px 0;margin-bottom:24px;font-size:12px;line-height:2;}.rpt-meta strong{display:inline-block;width:130px;color:#444;}.rpt-sec{font-size:15px;font-weight:700;color:#111;margin-bottom:12px;border-bottom:1px solid #eee;padding-bottom:6px;}table{width:100%;border-collapse:collapse;font-size:11px;}thead tr{background:#FF0531;color:#fff;}th{padding:9px 10px;text-align:left;font-weight:600;font-size:10.5px;text-transform:uppercase;}td{padding:8px 10px;border-bottom:1px solid #f0f0f0;color:#333;}.rpt-footer{margin-top:32px;text-align:center;font-size:10px;color:#aaa;border-top:1px solid #eee;padding-top:12px;}</style></head><body><div class="rpt-header"><div class="rpt-logo">🏥</div><div><div class="rpt-title">MediSafe Monitoring Log Report</div><div class="rpt-sub">Your Hospital Name</div></div></div><hr/><div class="rpt-meta"><div><strong>Report Date:</strong> ' + reportDate + '</div><div><strong>Time Generated:</strong> ' + reportTime + '</div><div><strong>Period:</strong> ' + (rangeLabels[range] || range) + '</div><div><strong>Generated By:</strong> MediSafe System</div></div><div class="rpt-sec">Monitoring Log Report</div><table><thead><tr><th>User</th><th>Date</th><th>Time</th><th>Temperature</th><th>Humidity</th><th>UV Index</th><th>Notes</th></tr></thead><tbody>' + rowsHtml + '</tbody></table><div class="rpt-footer">MediSafe System — Monitoring Log Report — ' + reportDate + ' at ' + reportTime + '</div></body></html>';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+      a.download = `medisafe_monitoring_log_${range}_${Date.now()}.html`;
+      a.click();
+      
+    }
