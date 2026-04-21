@@ -570,6 +570,11 @@ if (format === 'pdf') monitoringExportPDF(range); else monitoringExportCSV(range
       a.click();
     }
 
+  const rangeLabels = { 
+    current:'Current Page', '1month':'Last 1 Month', '2months':'Last 2 Months', 
+    '3months':'Last 3 Months (Recommended)', alltime:'All Time' 
+  };
+
 function monitoringExportPDF(range) {
   const data = monitoringGetExportRows(range);
   const now = new Date();
@@ -595,11 +600,6 @@ function monitoringExportPDF(range) {
   // Small delay ensures DOM updates before print
   setTimeout(() => window.print(), 100);
 }
-
-  const rangeLabels = { 
-    current:'Current Page', '1month':'Last 1 Month', '2months':'Last 2 Months', 
-    '3months':'Last 3 Months (Recommended)', alltime:'All Time' 
-  };
 </script>
 
 <!-- PRINT TEMPLATE - HIDDEN PDF REPORT STRUCTURE -->
