@@ -495,6 +495,9 @@ document.getElementById('searchInput').addEventListener('input', function () {
 
 document.getElementById('refreshBtn').addEventListener('click', loadUsers);
 document.getElementById('exportUsersBtn').addEventListener('click', exportCSV);
+document.getElementById('filterUsersBtn').addEventListener('click', () => {
+  showToast('Filter: Use tabs above (All/Pending/Approved) or search for filtering!', 'info');
+});
 
 /* ── Real-time subscription ─────────────────────────────── */
   sb.channel('registrations-realtime')
